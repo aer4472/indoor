@@ -161,6 +161,17 @@ class Database {
           for (const sql of migrations) {
             try { await this.run(sql); } catch {}
           }
+
+          // Gera PIN para TVs que ainda não têm
+          try {
+            const tvsSemPin = await this.all("SELECT id FROM tvs WHERE pin IS NULL OR pin = ''");
+            for (const tv of tvsSemPin) {
+              const pin = Math.floor(100000 + Math.random() * 900000).toString();
+              await this.run('UPDATE tvs SET pin = ? WHERE id = ?', [pin, tv.id]);
+              console.log(`🔑 PIN gerado para TV ${tv.id}: ${pin}`);
+            }
+          } catch(e) { console.error('Erro ao gerar PINs:', e); }
+
           resolve();
         }
       });
