@@ -281,6 +281,25 @@
 <div id="toast"></div>
 
 <script>
+// BOOT RÁPIDO: mostra PIN assim que o DOM carrega, sem esperar nada
+document.addEventListener('DOMContentLoaded', function() {
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem('indoorTvCfg')||'{}'); } catch(e) {}
+  if (!saved || !saved.tvId) {
+    var overlay = document.getElementById('overlay');
+    var msg = document.getElementById('overlay-msg');
+    var spinner = document.getElementById('spinner');
+    var setup = document.getElementById('setup-form');
+    if (overlay) overlay.classList.remove('hidden');
+    if (msg) msg.textContent = 'Digite o PIN da TV';
+    if (spinner) spinner.style.display = 'none';
+    if (setup) setup.classList.remove('hidden');
+    setTimeout(function() {
+      var first = document.querySelector('.pin-digit');
+      if (first) first.focus();
+    }, 100);
+  }
+});
 const API = window.location.origin + '/api';
 
 // ── Estado ──────────────────────────────────────────────────────
