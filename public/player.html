@@ -1861,22 +1861,47 @@ async function init() {
   }
   loadCfg();
 
-  // Timeout de segurança: se após 10s ainda estiver em "Inicializando...", mostra erro
+  // Timeout de segurança — 30s para dar tempo do Render acordar do sleep
+  let dotCount = 0;
+  const wakeMsg = setInterval(() => {
+    dotCount++;
+    if (el.overlayMsg.textContent.startsWith('Aguardando') || el.overlayMsg.textContent === 'Inicializando...') {
+      el.overlayMsg.textContent = 'Aguardando servidor' + '.'.repeat((dotCount % 3) + 1);
+    }
+  }, 1000);
   const safetyTimer = setTimeout(() => {
-    if (el.overlayMsg.textContent === 'Inicializando...') {
-      showOverlay(`⏱ Tempo esgotado\nServidor: ${API}\n\nVerifique se o servidor está rodando e se o endereço está correto.`, 'error');
+    clearInterval(wakeMsg);
+    if (!el.overlay.classList.contains('hidden')) {
+      showOverlay(`⏱ Servidor não respondeu\n\nTente recarregar a página.`, 'error');
       el.errorBtns.classList.remove('hidden');
     }
-  }, 10000);
+  }, 35000);
 
   try {
-    if (cfg.tvId) await startPlayer();
-    else { showOverlay('Digite o PIN da TV','setup'); document.querySelector('.pin-digit')?.focus(); }
+    if (cfg.tvId) {
+      try {
+        await startPlayer();
+      } catch(e) {
+        // Se TV não encontrada ou erro de conexão, volta para tela de PIN
+        if (e.code === 404) {
+          cfg.tvId = null; cfg.tvName = null; saveCfg();
+          showOverlay('TV não encontrada. Digite o PIN novamente.','setup');
+          setTimeout(() => document.querySelector('.pin-digit')?.focus(), 100);
+        } else {
+          showOverlay(`❌ Erro: ${e.message}\nServidor: ${API}`, 'error');
+          el.errorBtns.classList.remove('hidden');
+        }
+      }
+    } else {
+      showOverlay('Digite o PIN da TV','setup');
+      setTimeout(() => document.querySelector('.pin-digit')?.focus(), 100);
+    }
   } catch(e) {
     showOverlay(`❌ Erro: ${e.message}\nServidor: ${API}`, 'error');
     el.errorBtns.classList.remove('hidden');
   } finally {
     clearTimeout(safetyTimer);
+    clearInterval(wakeMsg);
   }
 }
 
