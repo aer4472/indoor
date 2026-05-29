@@ -71,20 +71,27 @@ function getVideoDuration(filePath) {
 
 // Extrai o ID do YouTube de qualquer formato de URL
 function extractYouTubeId(url) {
-  // Verificar se é playlist (list=PLxxx)
-  const plMatch = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
-  if (plMatch) return { type: 'playlist', id: plMatch[1] };
-
-  const patterns = [
+  const videoPatterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
     /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
     /youtube\.com\/live\/([a-zA-Z0-9_-]{11})/,
     /^([a-zA-Z0-9_-]{11})$/
   ];
-  for (const p of patterns) {
+
+  // Extrai videoId
+  let videoId = null;
+  for (const p of videoPatterns) {
     const m = url.match(p);
-    if (m) return { type: 'video', id: m[1] };
+    if (m) { videoId = m[1]; break; }
   }
+
+  // Extrai listId (playlist)
+  const listMatch = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+  const listId = listMatch ? listMatch[1] : null;
+
+  if (videoId && listId) return { type: 'video_playlist', videoId, listId };
+  if (listId && !videoId)  return { type: 'playlist', id: listId };
+  if (videoId)              return { type: 'video', id: videoId };
   return null;
 }
 
@@ -98,15 +105,29 @@ router.post('/youtube', async (req, res, next) => {
     if (!extracted) return res.status(400).json({ error: 'URL do YouTube inválida' });
 
     const id = `video-${uuidv4().substring(0, 8)}`;
-    const typeLabel = extracted.type === 'playlist' ? 'Playlist YT' : 'YouTube';
-    const displayName = name && name.trim() ? name.trim() : `${typeLabel}: ${extracted.id}`;
-    // Salvar tipo no campo mime_type: 'youtube' ou 'youtube_playlist'
-    const mimeType = extracted.type === 'playlist' ? 'youtube_playlist' : 'youtube';
+
+    let filename, mimeType, typeLabel;
+    if (extracted.type === 'video_playlist') {
+      // Vídeo com playlist — salva "videoId|listId" no filename
+      filename  = `${extracted.videoId}|${extracted.listId}`;
+      mimeType  = 'youtube_playlist';
+      typeLabel = 'YouTube+Playlist';
+    } else if (extracted.type === 'playlist') {
+      filename  = extracted.id;
+      mimeType  = 'youtube_playlist';
+      typeLabel = 'Playlist YT';
+    } else {
+      filename  = extracted.id;
+      mimeType  = 'youtube';
+      typeLabel = 'YouTube';
+    }
+
+    const displayName = name && name.trim() ? name.trim() : `${typeLabel}: ${filename}`;
 
     await db.run(
       `INSERT INTO videos (id, filename, original_name, size, mime_type, media_type)
        VALUES (?, ?, ?, 0, ?, 'youtube')`,
-      [id, extracted.id, displayName, mimeType]
+      [id, filename, displayName, mimeType]
     );
 
     const video = await db.get('SELECT * FROM videos WHERE id = ?', [id]);
