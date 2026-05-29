@@ -5,6 +5,17 @@ const db = require('../database/db');
 let io = null;
 function setIO(s) { io = s; }
 
+// Autenticação por PIN da TV — rota pública
+router.post('/auth-tv', async (req, res, next) => {
+  try {
+    const { pin } = req.body;
+    if (!pin) return res.status(400).json({ error: 'PIN obrigatório' });
+    const tv = await db.get('SELECT id, name, pin FROM tvs WHERE pin = ?', [pin.toString().trim()]);
+    if (!tv) return res.status(401).json({ error: 'PIN inválido' });
+    res.json({ ok: true, tvId: tv.id, tvName: tv.name });
+  } catch (e) { next(e); }
+});
+
 router.get('/tvs', async (req, res, next) => {
   try {
     const tvs = await db.all('SELECT id, name, status FROM tvs ORDER BY name ASC');
