@@ -1854,51 +1854,41 @@ function resetCfg() {
 }
 
 async function init() {
-  // ?reset=1 na URL limpa config salva (útil ao trocar IP/porta do servidor)
+  // ?reset=1 na URL limpa config salva
   if (new URLSearchParams(window.location.search).get('reset') === '1') {
     localStorage.removeItem('indoorTvCfg');
     history.replaceState(null, '', window.location.pathname);
   }
   loadCfg();
 
-  // Timeout de segurança — 30s para dar tempo do Render acordar do sleep
+  // Sem tvId salvo: mostra PIN imediatamente, sem falar com servidor
+  if (!cfg.tvId) {
+    showOverlay('Digite o PIN da TV', 'setup');
+    setTimeout(() => document.querySelector('.pin-digit')?.focus(), 50);
+    return;
+  }
+
+  // Tem tvId salvo: tenta reconectar com timeout de 30s
   let dotCount = 0;
+  showOverlay('Conectando ao servidor...');
   const wakeMsg = setInterval(() => {
     dotCount++;
-    if (el.overlayMsg.textContent.startsWith('Aguardando') || el.overlayMsg.textContent === 'Inicializando...') {
-      el.overlayMsg.textContent = 'Aguardando servidor' + '.'.repeat((dotCount % 3) + 1);
-    }
-  }, 1000);
+    el.overlayMsg.textContent = 'Conectando ao servidor' + '.'.repeat((dotCount % 3) + 1);
+  }, 800);
+
   const safetyTimer = setTimeout(() => {
     clearInterval(wakeMsg);
-    if (!el.overlay.classList.contains('hidden')) {
-      showOverlay(`⏱ Servidor não respondeu\n\nTente recarregar a página.`, 'error');
-      el.errorBtns.classList.remove('hidden');
-    }
-  }, 35000);
+    cfg.tvId = null; cfg.tvName = null; saveCfg();
+    showOverlay('Digite o PIN da TV', 'setup');
+    setTimeout(() => document.querySelector('.pin-digit')?.focus(), 50);
+  }, 30000);
 
   try {
-    if (cfg.tvId) {
-      try {
-        await startPlayer();
-      } catch(e) {
-        // Se TV não encontrada ou erro de conexão, volta para tela de PIN
-        if (e.code === 404) {
-          cfg.tvId = null; cfg.tvName = null; saveCfg();
-          showOverlay('TV não encontrada. Digite o PIN novamente.','setup');
-          setTimeout(() => document.querySelector('.pin-digit')?.focus(), 100);
-        } else {
-          showOverlay(`❌ Erro: ${e.message}\nServidor: ${API}`, 'error');
-          el.errorBtns.classList.remove('hidden');
-        }
-      }
-    } else {
-      showOverlay('Digite o PIN da TV','setup');
-      setTimeout(() => document.querySelector('.pin-digit')?.focus(), 100);
-    }
+    await startPlayer();
   } catch(e) {
-    showOverlay(`❌ Erro: ${e.message}\nServidor: ${API}`, 'error');
-    el.errorBtns.classList.remove('hidden');
+    cfg.tvId = null; cfg.tvName = null; saveCfg();
+    showOverlay('Digite o PIN da TV', 'setup');
+    setTimeout(() => document.querySelector('.pin-digit')?.focus(), 50);
   } finally {
     clearTimeout(safetyTimer);
     clearInterval(wakeMsg);
