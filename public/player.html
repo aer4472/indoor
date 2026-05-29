@@ -298,6 +298,7 @@
 
 <div id="update-banner">🔄 Atualizando...</div>
 <div id="toast"></div>
+  <div id="ctrl"></div>
 
 <script>
 // BOOT RÁPIDO: mostra PIN assim que o DOM carrega, sem esperar nada
@@ -421,9 +422,9 @@ let ctrlT = null;
 })();
 
 document.addEventListener('mousemove', ()=>{
-  el.ctrl.classList.add('show');
+  if(el.ctrl) el.ctrl.classList.add('show');
   clearTimeout(ctrlT);
-  ctrlT = setTimeout(()=>el.ctrl.classList.remove('show'), 3000);
+  ctrlT = setTimeout(()=>{ if(el.ctrl) el.ctrl.classList.remove('show'); }, 3000);
 });
 
 // Teclas
@@ -463,7 +464,7 @@ function toast(msg, ms=4000) {
   el.toast.textContent=msg; el.toast.classList.add('show');
   clearTimeout(toastT); toastT=setTimeout(()=>el.toast.classList.remove('show'),ms);
 }
-function flashBanner() { el.banner.classList.add('show'); setTimeout(()=>el.banner.classList.remove('show'),3000); }
+function flashBanner() { el.banner && el.banner.classList.add('show'); setTimeout(()=>el.banner && el.banner.classList.remove('show'),3000); }
 
 // ── Sirene ───────────────────────────────────────────────────────
 function startSiren() {
