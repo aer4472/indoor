@@ -215,8 +215,21 @@
     <p id="overlay-msg">Inicializando...</p>
     <div id="spinner" class="spinner"></div>
     <div id="setup-form" class="hidden">
-      <select id="tv-select"><option value="">Selecione uma TV</option></select>
-      <button class="btn-primary" id="connect-btn">▶ Conectar</button>
+      <!-- Passo 1: senha -->
+      <div id="step-password">
+        <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:14px;">🔐 Digite a senha do painel para continuar</div>
+        <input id="setup-password" type="password" placeholder="Senha do sistema" autocomplete="off"
+          style="width:100%;padding:11px 14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;color:#fff;font-size:14px;margin-bottom:10px;outline:none;"/>
+        <div id="password-error" style="color:#f87171;font-size:12px;margin-bottom:8px;display:none;">❌ Senha incorreta. Tente novamente.</div>
+        <button class="btn-primary" id="auth-btn">🔓 Autenticar</button>
+      </div>
+      <!-- Passo 2: selecionar TV -->
+      <div id="step-tv" class="hidden">
+        <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:14px;">📺 Selecione a TV para este display</div>
+        <select id="tv-select"><option value="">— Selecione uma TV —</option></select>
+        <button class="btn-primary" id="connect-btn">▶ Conectar</button>
+        <button class="btn-sec" style="width:100%;padding:10px;border:none;border-radius:10px;font-size:13px;cursor:pointer;margin-top:8px;" id="back-btn">← Voltar</button>
+      </div>
     </div>
     <div id="error-btns" class="btn-group hidden">
       <button class="btn-sec" id="reset-btn">🔄 Reconfigurar</button>
@@ -1829,7 +1842,7 @@ async function startPlayer() {
 function loadCfg() { try { const s=localStorage.getItem('indoorTvCfg'); if(s) cfg=JSON.parse(s); } catch {} }
 function saveCfg() { localStorage.setItem('indoorTvCfg',JSON.stringify(cfg)); }
 function resetCfg() {
-  localStorage.removeItem('indoorTvCfg'); cfg={tvId:null,tvName:null};
+  localStorage.removeItem('indoorTvCfg'); cfg={tvId:null,tvName:null,authToken:null};
   clearInterval(syncTimer); clearInterval(hbTimer); clearInterval(wTimer);
   stopTimers(); stopSiren();
   if (socket) socket.disconnect(); init();
@@ -1853,7 +1866,25 @@ async function init() {
 
   try {
     if (cfg.tvId) await startPlayer();
-    else { await loadTVList(); showOverlay('Configure este player','setup'); }
+    else {
+      showOverlay('Configure este player','setup');
+      // Se já tiver token salvo, pula direto para seleção de TV
+      if (cfg.authToken) {
+        try {
+          await loadTVList();
+          $('step-password').classList.add('hidden');
+          $('step-tv').classList.remove('hidden');
+        } catch(e) {
+          // Token inválido, volta para senha
+          cfg.authToken = null; saveCfg();
+          $('step-password').classList.remove('hidden');
+          $('step-tv').classList.add('hidden');
+        }
+      } else {
+        $('step-password').classList.remove('hidden');
+        $('step-tv').classList.add('hidden');
+      }
+    }
   } catch(e) {
     showOverlay(`❌ Erro: ${e.message}\nServidor: ${API}`, 'error');
     el.errorBtns.classList.remove('hidden');
@@ -1861,6 +1892,47 @@ async function init() {
     clearTimeout(safetyTimer);
   }
 }
+
+// ── Auth setup ───────────────────────────────────────────────────
+$('auth-btn').onclick = async () => {
+  const pwd = $('setup-password').value.trim();
+  if (!pwd) { $('setup-password').focus(); return; }
+  $('auth-btn').disabled = true;
+  $('auth-btn').textContent = 'Verificando...';
+  $('password-error').style.display = 'none';
+  try {
+    const r = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username:'admin', password: pwd})
+    });
+    if (r.ok) {
+      const data = await r.json();
+      cfg.authToken = data.token;
+      saveCfg();
+      await loadTVList();
+      $('step-password').classList.add('hidden');
+      $('step-tv').classList.remove('hidden');
+    } else {
+      $('password-error').style.display = 'block';
+      $('setup-password').value = '';
+      $('setup-password').focus();
+    }
+  } catch(e) {
+    $('password-error').textContent = '❌ Erro de conexão com o servidor.';
+    $('password-error').style.display = 'block';
+  }
+  $('auth-btn').disabled = false;
+  $('auth-btn').textContent = '🔓 Autenticar';
+};
+$('setup-password').onkeydown = e => { if(e.key==='Enter') $('auth-btn').click(); };
+
+$('back-btn').onclick = () => {
+  $('step-tv').classList.add('hidden');
+  $('step-password').classList.remove('hidden');
+  $('setup-password').value = '';
+  $('password-error').style.display = 'none';
+};
 
 $('connect-btn').onclick = async()=>{
   const sel=el.tvSelect; if(!sel.value){alert('Selecione uma TV');return;}
