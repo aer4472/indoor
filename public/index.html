@@ -1,0 +1,2549 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Indoor TV">
+  <link rel="manifest" href="/manifest.json">
+  <title>Indoor TV — Painel</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+  <style>
+    body{margin:0;font-family:system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent;}
+    @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .fadein{animation:fadein .2s ease}
+    .drag-item{cursor:grab;transition:opacity .15s}
+    .drag-item.dragging{opacity:.4;background:#eff6ff!important}
+    .badge-online{background:#dcfce7;color:#166534}
+    .badge-offline{background:#fee2e2;color:#991b1b}
+    .badge-warn{background:#fef3c7;color:#92400e}
+    @media(max-width:768px){
+  #sidebar{display:none!important}
+  #mobile-nav{display:none!important}
+  #main-content{padding-bottom:0!important}
+  #mobile-drawer{display:flex!important}
+  #mobile-overlay{display:block!important}
+}
+#mobile-nav{display:none}
+#mobile-drawer{display:none;position:fixed;top:0;left:0;bottom:0;z-index:200;flex-direction:column;width:220px;box-shadow:4px 0 24px rgba(0,0,0,.35);transition:transform .28s cubic-bezier(.4,0,.2,1);}
+#mobile-drawer.closed{transform:translateX(-100%);}
+#mobile-overlay{display:none;position:fixed;inset:0;z-index:199;background:rgba(0,0,0,.45);backdrop-filter:blur(2px);}
+#mobile-menu-btn{display:none;position:fixed;top:12px;left:12px;z-index:201;width:40px;height:40px;border-radius:10px;border:none;cursor:pointer;align-items:center;justify-content:center;font-size:20px;box-shadow:0 2px 10px rgba(0,0,0,.2);}
+@media(max-width:768px){#mobile-menu-btn{display:flex!important}}
+    #mobile-nav{display:none}
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px}
+  </style>
+</head>
+<body class="bg-gray-50">
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback} = React;
+const API = window.location.origin+'/api';
+let TOKEN = localStorage.getItem('indoor_tv_token')||'';
+
+const api = {
+  _f:(url,opts={})=>{const h={'Content-Type':'application/json',...(opts.headers||{})};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;return fetch(url,{...opts,headers:h});},
+  login:(u,p)=>fetch(`${API}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})}).then(r=>r.json()),
+  getTVs:()=>api._f(`${API}/tvs`).then(r=>r.json()),
+  createTV:d=>api._f(`${API}/tvs`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
+  updateTV:(id,d)=>api._f(`${API}/tvs/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
+  deleteTV:id=>api._f(`${API}/tvs/${id}`,{method:'DELETE'}),
+  getPlaylists:()=>api._f(`${API}/playlists`).then(r=>r.json()),
+  createPlaylist:d=>api._f(`${API}/playlists`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
+  updatePlaylist:(id,d)=>api._f(`${API}/playlists/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
+  deletePlaylist:id=>api._f(`${API}/playlists/${id}`,{method:'DELETE'}),
+  getVideos:()=>api._f(`${API}/videos`).then(r=>r.json()),
+  uploadVideo:(file,dur)=>{const fd=new FormData();fd.append('video',file);fd.append('display_duration',dur||10);const h={};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;return fetch(`${API}/videos/upload`,{method:'POST',headers:h,body:fd}).then(r=>r.json());},
+  patchVideo:(id,d)=>api._f(`${API}/videos/${id}`,{method:'PATCH',body:JSON.stringify(d)}).then(r=>r.json()),
+  encodeRotate:(id,rotation)=>api._f(`${API}/videos/${id}/encode-rotate`,{method:'POST',body:JSON.stringify({rotation})}).then(r=>r.json()),
+  checkEncodeJob:(jobId)=>api._f(`${API}/videos/encode-job/${jobId}`).then(r=>r.json()),
+  deleteVideo:id=>api._f(`${API}/videos/${id}`,{method:'DELETE'}),
+  addYoutube:(url,name)=>api._f(`${API}/videos/youtube`,{method:'POST',body:JSON.stringify({url,name})}).then(r=>r.json()),
+  getSchedules:(tvId)=>api._f(`${API}/schedules${tvId?`?tv_id=${tvId}`:''}`).then(r=>r.json()),
+  createSchedule:d=>api._f(`${API}/schedules`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
+  updateSchedule:(id,d)=>api._f(`${API}/schedules/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
+  deleteSchedule:id=>api._f(`${API}/schedules/${id}`,{method:'DELETE'}),
+  getEmergency:()=>api._f(`${API}/emergency`).then(r=>r.json()),
+  setEmergency:d=>api._f(`${API}/emergency`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
+  getWidgets:()=>api._f(`${API}/widgets`).then(r=>r.json()),
+  createWidget:d=>api._f(`${API}/widgets`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
+  updateWidget:(id,d)=>api._f(`${API}/widgets/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
+  deleteWidget:id=>api._f(`${API}/widgets/${id}`,{method:'DELETE'}),
+  getUsers:()=>api._f(`${API}/users`).then(r=>r.json()),
+  createUser:d=>api._f(`${API}/users`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
+  updateUser:(id,d)=>api._f(`${API}/users/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
+  deleteUser:id=>api._f(`${API}/users/${id}`,{method:'DELETE'}),
+  reloadTVs:(tvId)=>api._f(`${API}/tvs/reload`,{method:'POST',body:JSON.stringify({tv_id:tvId||null})}).then(r=>r.json()),
+  getSettings:()=>api._f(`${API}/settings`).then(r=>r.json()),
+  saveSettings:d=>api._f(`${API}/settings`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
+  getSponsors:()=>api._f(`${API}/sponsors`).then(r=>r.json()),
+  createSponsorGroup:data=>api._f(`${API}/sponsors/groups`,{method:'POST',body:JSON.stringify(data)}).then(r=>r.json()),
+  updateSponsorGroup:(gid,data)=>api._f(`${API}/sponsors/groups/${gid}`,{method:'PUT',body:JSON.stringify(data)}).then(r=>r.json()),
+  deleteSponsorGroup:gid=>api._f(`${API}/sponsors/groups/${gid}`,{method:'DELETE'}).then(r=>r.json()),
+  uploadSponsorLogo:(gid,file)=>{const fd=new FormData();fd.append('image',file);fd.append('name',file.name.replace(/\.[^.]+$/,''));const h={};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;return fetch(`${API}/sponsors/groups/${gid}/upload`,{method:'POST',headers:h,body:fd}).then(r=>r.json());},
+  deleteSponsorLogo:(gid,lid)=>api._f(`${API}/sponsors/groups/${gid}/logos/${lid}`,{method:'DELETE'}).then(r=>r.json()),
+  reorderSponsorLogos:(gid,ids)=>api._f(`${API}/sponsors/groups/${gid}/order`,{method:'PUT',body:JSON.stringify({ids})}).then(r=>r.json()),
+  uploadLogo:(file,type)=>{const fd=new FormData();fd.append('logo',file);fd.append('type',type||'sponsor');const h={};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;return fetch(`${API}/settings/logo`,{method:'POST',headers:h,body:fd}).then(r=>r.json());},
+  getReportStatus:()=>api._f(`${API}/reports/status`).then(r=>r.json()),
+  getReportStats:()=>api._f(`${API}/reports/stats`).then(r=>r.json()),
+  getReportPlayback:(tvId,days)=>api._f(`${API}/reports/playback?${tvId?`tv_id=${tvId}&`:''}days=${days||1}&limit=100`).then(r=>r.json()),
+  getAuditLog:()=>api._f(`${API}/reports/audit`).then(r=>r.json()),
+};
+
+const fmt = {
+  size:b=>b>1048576?`${(b/1048576).toFixed(1)} MB`:`${(b/1024).toFixed(0)} KB`,
+  dur:s=>s?`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`:'—',
+  dt:iso=>iso?new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—',
+  time:iso=>iso?new Date(iso).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—',
+};
+const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function Modal({title,onClose,onSave,children,wide,xl,saveLabel='Salvar',saveDanger=false}) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-0 md:p-4" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className={`bg-white rounded-t-2xl md:rounded-2xl shadow-2xl fadein w-full ${xl?'md:max-w-4xl':wide?'md:max-w-2xl':'md:max-w-md'} max-h-[92vh] flex flex-col`}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h3 className="font-semibold text-gray-800">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+        </div>
+        <div className="p-5 overflow-y-auto flex-1">{children}</div>
+        {onSave&&<div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-100 flex-shrink-0">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancelar</button>
+          <button onClick={onSave} className={`px-5 py-2 text-sm text-white rounded-lg font-medium transition ${saveDanger?'bg-red-600 hover:bg-red-700':'bg-blue-600 hover:bg-blue-700'}`}>{saveLabel}</button>
+        </div>}
+      </div>
+    </div>
+  );
+}
+function Lbl({children}){return <label className="block text-sm font-medium text-gray-700 mb-1">{children}</label>;}
+function Inp({value,onChange,placeholder,type='text',disabled=false}){
+  return <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} disabled={disabled}
+    className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm focus:outline-none focus:border-blue-400 disabled:bg-gray-50"/>;
+}
+function Sel({value,onChange,children,className=''}){
+  return <select value={value} onChange={e=>onChange(e.target.value)} className={`w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm bg-white ${className}`}>{children}</select>;
+}
+function StatCard({icon,label,value,sub,color='blue'}){
+  const bg={blue:'bg-blue-50',green:'bg-green-50',yellow:'bg-yellow-50',red:'bg-red-50'}[color];
+  const tc={blue:'text-blue-600',green:'text-green-600',yellow:'text-yellow-600',red:'text-red-600'}[color];
+  return <div className={`${bg} rounded-xl p-4`}>
+    <div className="flex items-center gap-2 mb-1"><span className="text-lg">{icon}</span><span className={`text-xs font-medium ${tc}`}>{label}</span></div>
+    <div className="text-2xl font-bold text-gray-800">{value}</div>
+    {sub&&<div className="text-xs text-gray-500 mt-0.5">{sub}</div>}
+  </div>;
+}
+
+// ── LOGIN ────────────────────────────────────────────────────────
+function LoginPage({onLogin}) {
+  const [u,setU]=useState('admin');const [p,setP]=useState('');const [err,setErr]=useState('');const [loading,setLoading]=useState(false);
+  const submit=async()=>{setLoading(true);setErr('');const r=await api.login(u,p);if(r.token){TOKEN=r.token;localStorage.setItem('indoor_tv_token',r.token);onLogin(r.username);}else setErr(r.error||'Erro');setLoading(false);};
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm fadein">
+        <div className="text-center mb-6"><div className="text-5xl mb-2">📺</div><h1 className="text-2xl font-bold">Indoor TV</h1><p className="text-gray-400 text-sm">v1.0</p></div>
+        {err&&<div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{err}</div>}
+        <Lbl>Usuário</Lbl><Inp value={u} onChange={setU}/>
+        <Lbl>Senha</Lbl><Inp value={p} onChange={setP} type="password"/>
+        <button onClick={submit} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 mt-1">{loading?'Entrando...':'Entrar'}</button>
+        <p className="text-center text-xs text-gray-400 mt-4">Padrão: admin / indoor123</p>
+        <div className="border-t border-gray-100 mt-5 pt-4 text-center">
+          <p className="text-xs text-gray-400 leading-relaxed">© Todos os direitos reservados</p>
+          <p className="text-xs font-semibold text-gray-600 mt-0.5">Eduardo Soluções Tecnológicas</p>
+          <p className="text-xs text-gray-400 mt-0.5">📞 (91) 98819-6385</p>
+          <p className="text-xs text-gray-400">📸 @eduardosolucoestec</p>
+          <p className="text-xs text-gray-300 mt-1">v1.0</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SIDEBAR ──────────────────────────────────────────────────────
+const NAV=[
+  {id:'dashboard',icon:'📊',label:'Dashboard'},
+  {id:'tvs',icon:'📺',label:'TVs'},
+  {id:'videos',icon:'🎬',label:'Mídias'},
+  {id:'playlists',icon:'📋',label:'Playlists'},
+  {id:'schedules',icon:'🕐',label:'Agendamentos'},
+  {id:'widgets',icon:'🧩',label:'Widgets'},
+  {id:'sponsors',icon:'🏆',label:'Patrocinadores'},
+  {id:'emergency',icon:'🚨',label:'Emergência'},
+  {id:'reports',icon:'📈',label:'Relatórios'},
+  {id:'users',icon:'👥',label:'Usuários'},
+  {id:'settings',icon:'🎨',label:'Aparência'},
+];
+
+function Sidebar({page,setPage,logout,username,reloadTVs,reloading,theme={}}){
+  const bg    = theme.sidebarBg    || '#111827';
+  const txt   = theme.sidebarText  || '#9ca3af';
+  const act   = theme.sidebarActive|| '#2563eb';
+  const name  = theme.panelName    || 'Indoor TV';
+  const logo  = theme.panelLogo    || '';
+
+  return (
+    <div id="sidebar" className="w-52 flex flex-col flex-shrink-0" style={{background:bg}}>
+      <div className="p-4 border-b" style={{borderColor:'rgba(255,255,255,.08)'}}>
+        {logo
+          ? <div className="flex items-center gap-2.5 mb-1">
+              <img src={logo} alt="Logo" style={{height:34,maxWidth:110,objectFit:'contain',borderRadius:4}}/>
+            </div>
+          : <div className="flex items-center gap-2 mb-1">
+              <span className="text-2xl">📺</span>
+              <h1 className="font-bold text-sm text-white">{name}</h1>
+            </div>
+        }
+        <p className="text-xs" style={{color:'rgba(255,255,255,.35)'}}>{username}</p>
+      </div>
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
+        {NAV.map(i=>{
+          const isActive = page===i.id;
+          return (
+            <button key={i.id} onClick={()=>setPage(i.id)}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition"
+              style={{
+                background: isActive ? act : 'transparent',
+                color: isActive ? '#fff' : txt,
+              }}
+              onMouseEnter={e=>{if(!isActive){e.currentTarget.style.background='rgba(255,255,255,.07)';e.currentTarget.style.color='#fff';}}}
+              onMouseLeave={e=>{if(!isActive){e.currentTarget.style.background='transparent';e.currentTarget.style.color=txt;}}}>
+              <span>{i.icon}</span>{i.label}
+            </button>
+          );
+        })}
+      </nav>
+      <div className="p-2 space-y-1" style={{borderTop:'1px solid rgba(255,255,255,.07)'}}>
+        <button onClick={()=>reloadTVs(null)} disabled={!!reloading}
+          className="w-full flex items-center gap-2 justify-center px-3 py-2 rounded-lg text-xs font-medium transition disabled:opacity-50"
+          style={{background:'rgba(255,255,255,.06)',color:txt}}
+          onMouseEnter={e=>{e.currentTarget.style.background='#ea580c';e.currentTarget.style.color='#fff';}}
+          onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,.06)';e.currentTarget.style.color=txt;}}>
+          <span className={reloading?'inline-block animate-spin':''}>🔄</span>
+          {reloading?'Recarregando...':'Recarregar TVs'}
+        </button>
+        <button onClick={logout}
+          className="w-full text-xs py-2 flex items-center gap-2 justify-center transition"
+          style={{color:'rgba(255,255,255,.3)'}}
+          onMouseEnter={e=>e.currentTarget.style.color='#f87171'}
+          onMouseLeave={e=>e.currentTarget.style.color='rgba(255,255,255,.3)'}>
+          🚪 Sair
+        </button>
+        <div className="px-2 pt-2" style={{borderTop:'1px solid rgba(255,255,255,.05)'}}>
+          <p className="text-center" style={{color:'rgba(255,255,255,.2)',fontSize:9,lineHeight:'1.6'}}>
+            v1.0 — Todos os direitos reservados<br/>
+            Eduardo Soluções Tecnológicas<br/>
+            📞 91 98819-6385<br/>
+            📸 @eduardosolucoestec
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MobileDrawer({page,setPage,logout,username,reloadTVs,reloading,theme={}}){
+  const [open,setOpen]=useState(false);
+  const bg  = theme.sidebarBg    || '#111827';
+  const txt = theme.sidebarText  || '#9ca3af';
+  const act = theme.sidebarActive|| '#2563eb';
+  const name = theme.panelName   || 'Indoor TV';
+  const logo = theme.panelLogo   || '';
+
+  const go=(id)=>{setPage(id);setOpen(false);};
+
+  return (<>
+    {/* Botão hamburguer */}
+    <button id="mobile-menu-btn" onClick={()=>setOpen(true)} style={{background:bg,color:'#fff'}}>☰</button>
+
+    {/* Overlay escuro */}
+    <div id="mobile-overlay" onClick={()=>setOpen(false)}
+      style={{opacity:open?1:0,pointerEvents:open?'auto':'none',transition:'opacity .28s'}}/>
+
+    {/* Drawer lateral */}
+    <div id="mobile-drawer" className={open?'':'closed'} style={{background:bg}}>
+      {/* Header */}
+      <div style={{padding:'16px 14px 12px',borderBottom:'1px solid rgba(255,255,255,.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          {logo
+            ? <img src={logo} alt="" style={{height:28,maxWidth:90,objectFit:'contain',borderRadius:3}}/>
+            : <><span style={{fontSize:20}}>📺</span><span style={{fontWeight:700,fontSize:13,color:'#fff'}}>{name}</span></>
+          }
+        </div>
+        <button onClick={()=>setOpen(false)} style={{background:'rgba(255,255,255,.1)',border:'none',borderRadius:8,width:30,height:30,color:'#fff',fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+      </div>
+      <p style={{fontSize:11,color:'rgba(255,255,255,.3)',padding:'6px 14px 2px'}}>{username}</p>
+
+      {/* Nav items */}
+      <nav style={{flex:1,padding:'6px 8px',overflowY:'auto'}}>
+        {NAV.map(i=>{
+          const isA=page===i.id;
+          return <button key={i.id} onClick={()=>go(i.id)}
+            style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:10,border:'none',cursor:'pointer',marginBottom:2,fontSize:14,fontWeight:isA?600:400,background:isA?act:'transparent',color:isA?'#fff':txt,textAlign:'left'}}>
+            <span style={{fontSize:18}}>{i.icon}</span>{i.label}
+          </button>;
+        })}
+      </nav>
+
+      {/* Footer */}
+      <div style={{padding:'8px',borderTop:'1px solid rgba(255,255,255,.07)'}}>
+        <button onClick={()=>{reloadTVs(null);setOpen(false);}} disabled={!!reloading}
+          style={{width:'100%',padding:'10px',borderRadius:10,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:'rgba(255,255,255,.07)',color:txt,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:6}}>
+          <span className={reloading?'inline-block animate-spin':''}>🔄</span>
+          {reloading?'Recarregando...':'Recarregar TVs'}
+        </button>
+        <button onClick={()=>{logout();setOpen(false);}}
+          style={{width:'100%',padding:'8px',borderRadius:10,border:'none',cursor:'pointer',fontSize:12,color:'rgba(255,255,255,.35)',background:'transparent',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+          🚪 Sair
+        </button>
+      </div>
+    </div>
+  </>);
+}
+
+// ── APP ──────────────────────────────────────────────────────────
+function App(){
+  const [loggedIn,setLoggedIn]=useState(!!TOKEN);
+  const [username,setUsername]=useState(()=>{try{const t=TOKEN&&JSON.parse(atob(TOKEN.split('.')[1]));return t?.username||''}catch{return ''}});
+  const [page,setPage]=useState('dashboard');
+  const [data,setData]=useState({tvs:[],videos:[],playlists:[],schedules:[],widgets:[],emergency:{active:0},sponsors:{sponsors:[],config:{}}});
+  const [toast,setToast]=useState(null);
+  const [reloading,setReloading]=useState(false);
+  const [theme,setTheme]=useState({
+    sidebarBg:'#111827', sidebarText:'#9ca3af', sidebarActive:'#2563eb',
+    accentColor:'#2563eb', panelName:'Indoor TV', panelLogo:'',
+  });
+  const sockRef=useRef(null);
+
+  const showToast=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),3500);};
+
+  // Aplicar tema como variáveis CSS
+  useEffect(()=>{
+    const r=document.documentElement.style;
+    r.setProperty('--sidebar-bg',   theme.sidebarBg);
+    r.setProperty('--sidebar-text', theme.sidebarText);
+    r.setProperty('--sidebar-active',theme.sidebarActive);
+    r.setProperty('--accent',       theme.accentColor);
+  },[theme]);
+
+  const loadSettings=useCallback(async()=>{
+    try{
+      const s=await api.getSettings();
+      if(s&&typeof s==='object'){
+        setTheme(t=>({...t,...s}));
+      }
+    }catch{}
+  },[]);
+
+  const load=useCallback(async()=>{
+    try{
+      const [tvs,videos,playlists,schedules,widgets,emergency,spData]=await Promise.all([
+        api.getTVs(),api.getVideos(),api.getPlaylists(),api.getSchedules(),api.getWidgets(),api.getEmergency(),api.getSponsors()
+      ]);
+      setData({
+        tvs:Array.isArray(tvs)?tvs:[],
+        videos:Array.isArray(videos)?videos:[],
+        playlists:Array.isArray(playlists)?playlists:[],
+        schedules:Array.isArray(schedules)?schedules:[],
+        widgets:Array.isArray(widgets)?widgets:[],
+        emergency:emergency||{active:0},
+        sponsors:spData||{sponsors:[],config:{}},
+      });
+    }catch(e){console.warn('Load error:',e);}
+  },[]);
+
+  useEffect(()=>{if(loggedIn){load();loadSettings();}},[loggedIn,load,loadSettings]);
+  useEffect(()=>{
+    if(!loggedIn)return;
+    const sock=io(window.location.origin);
+    sockRef.current=sock;
+    sock.on('connect',()=>sock.emit('join-admin'));
+    sock.on('tvs-status-changed',()=>load());
+    return()=>sock.disconnect();
+  },[loggedIn]);
+  useEffect(()=>{if(!loggedIn)return;const t=setInterval(load,20000);return()=>clearInterval(t);},[loggedIn,load]);
+
+  const logout=()=>{TOKEN='';localStorage.removeItem('indoor_tv_token');setLoggedIn(false);};
+  const onLogin=u=>{setLoggedIn(true);setUsername(u);};
+
+  const reloadTVs=async(tvId=null)=>{
+    setReloading(tvId||'all');
+    try{
+      await api._f(`${API}/tvs/reload`,{method:'POST',body:JSON.stringify({tv_id:tvId||null})});
+      showToast(tvId?'🔄 TV recarregada!':'🔄 Todas as TVs recarregadas!');
+    }catch{showToast('Erro ao recarregar','error');}
+    setTimeout(()=>setReloading(false),2500);
+  };
+
+  if(!loggedIn) return <LoginPage onLogin={onLogin}/>;
+
+  const props={...data,onUpdate:load,showToast,reloadTVs,theme,setTheme,loadSettings};
+
+  return (
+    <div className="flex h-screen overflow-hidden" style={{background:'#f9fafb'}}>
+      <Sidebar page={page} setPage={setPage} logout={logout} username={username} reloadTVs={reloadTVs} reloading={reloading} theme={theme}/>
+      <div id="main-content" className="flex-1 overflow-y-auto">
+        {page==='dashboard'  && <DashboardPage  {...props} setPage={setPage}/>}
+        {page==='tvs'        && <TVsPage        {...props}/>}
+        {page==='videos'     && <VideosPage     {...props}/>}
+        {page==='playlists'  && <PlaylistsPage  {...props}/>}
+        {page==='schedules'  && <SchedulesPage  {...props}/>}
+        {page==='widgets'    && <WidgetsPage    {...props}/>}
+        {page==='emergency'  && <EmergencyPage  {...props}/>}
+        {page==='sponsors'   && <SponsorsPage   {...props}/>}
+        {page==='reports'    && <ReportsPage    {...props}/>}
+        {page==='users'      && <UsersPage      {...props}/>}
+        {page==='settings'   && <AppearancePage {...props}/>}
+      </div>
+      <MobileDrawer page={page} setPage={setPage} logout={logout} username={username} reloadTVs={reloadTVs} reloading={reloading} theme={theme}/>
+      {toast&&(
+        <div className={`fixed bottom-5 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl text-white text-sm font-medium shadow-lg z-50 fadein ${toast.type==='error'?'bg-red-600':'bg-gray-800'}`}>
+          {toast.type==='success'?'✅ ':toast.type==='error'?'❌ ':''}{toast.msg}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────────
+function DashboardPage({tvs,playlists,schedules,videos,setPage}){
+  const [stats,setStats]=useState(null);
+  const [liveStatus,setLiveStatus]=useState([]);
+  useEffect(()=>{
+    api.getReportStats().then(s=>!s.error&&setStats(s)).catch(()=>{});
+    api.getReportStatus().then(s=>Array.isArray(s)&&setLiveStatus(s)).catch(()=>{});
+  },[]);
+  const onlineCount=liveStatus.filter(t=>t.status==='online').length;
+  const activeScheds=schedules.filter(s=>s.active).length;
+  return (
+    <div className="p-4 md:p-6 fadein max-w-5xl">
+      <h2 className="text-xl md:text-2xl font-bold mb-5">Dashboard</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <StatCard icon="📺" label="TVs online" value={`${onlineCount}/${tvs.length}`} color={onlineCount===tvs.length&&tvs.length>0?'green':onlineCount>0?'yellow':'red'}/>
+        <StatCard icon="🎬" label="Mídias" value={videos.length} color="blue"/>
+        <StatCard icon="📋" label="Playlists" value={playlists.length} color="blue"/>
+        <StatCard icon="🕐" label="Agendamentos ativos" value={activeScheds} color="yellow"/>
+      </div>
+      {stats&&<div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+        <StatCard icon="▶" label="Reproduções hoje" value={stats.playsToday||0} color="green"/>
+        <StatCard icon="📡" label="TVs monitoradas" value={stats.tvCount||0} color="blue"/>
+        <StatCard icon="🏆" label="Mais tocada (7d)" value={stats.topMedia?.[0]?.video_name?.slice(0,20)||'—'} sub={stats.topMedia?.[0]?`${stats.topMedia[0].plays} vezes`:'Sem dados'} color="yellow"/>
+      </div>}
+      {/* Status ao vivo */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+        <h3 className="font-semibold mb-3 text-sm">📡 Status ao vivo das TVs</h3>
+        {liveStatus.length===0&&<p className="text-xs text-gray-400 text-center py-4">Nenhuma TV cadastrada</p>}
+        <div className="space-y-2">
+          {liveStatus.map(tv=>(
+            <div key={tv.id} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50">
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tv.status==='online'?'bg-green-500':'bg-red-400'}`}/>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{tv.name}</p>
+                {tv.status==='online'&&tv.current_video&&<p className="text-xs text-gray-500 truncate">▶ {tv.current_video}</p>}
+                {tv.status==='offline'&&<p className="text-xs text-gray-400">{tv.minutesAgo<60?`${tv.minutesAgo}min atrás`:tv.minutesAgo<1440?`${Math.round(tv.minutesAgo/60)}h atrás`:'Nunca visto'}</p>}
+              </div>
+              <span className="text-xs text-gray-400">{tv.playlist_name||'—'}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tv.status==='online'?'badge-online':'badge-offline'}`}>{tv.status==='online'?'Online':'Offline'}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Agendamentos próximos */}
+      {schedules.filter(s=>s.active).length>0&&(
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+          <h3 className="font-semibold mb-3 text-sm">🕐 Agendamentos ativos</h3>
+          <div className="space-y-2">
+            {schedules.filter(s=>s.active).slice(0,5).map(s=>(
+              <div key={s.id} className="flex items-center justify-between text-xs p-2 bg-blue-50 rounded-lg">
+                <div><p className="font-medium text-blue-800">{s.name}</p><p className="text-blue-600">{s.tv_name} · {s.start_time}–{s.end_time}</p></div>
+                <span className="text-blue-500">{(s.days||[]).map(d=>DAYS[d]).join(', ')}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TVs ──────────────────────────────────────────────────────────
+function TVsPage({tvs,playlists,onUpdate,showToast,reloadTVs}){
+  const [modal,setModal]=useState(false);const [edit,setEdit]=useState(null);
+  const [form,setForm]=useState({name:'',orientation:'horizontal',playlist_id:'',volume:100,transition:'fade'});
+  const [previewTv,setPreviewTv]=useState(null);
+  const open=(tv=null)=>{
+    setEdit(tv);
+    setForm(tv?{name:tv.name,orientation:tv.orientation||'horizontal',playlist_id:tv.playlist_id||'',volume:tv.volume??100,transition:tv.transition||'fade'}:{name:'',orientation:'horizontal',playlist_id:'',volume:100,transition:'fade'});
+    setModal(true);
+  };
+  const save=async()=>{if(!form.name.trim())return;edit?await api.updateTV(edit.id,form):await api.createTV(form);setModal(false);onUpdate();showToast(edit?'TV atualizada!':'TV criada!');};
+  const del=async id=>{if(!confirm('Remover TV?'))return;await api.deleteTV(id);onUpdate();showToast('Removida');};
+  const getPl=pid=>playlists.find(p=>p.id===pid)?.name||'—';
+  const playerUrl=id=>`${window.location.origin}/player.html`;
+
+  return (
+    <div className="p-4 md:p-6 fadein">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl md:text-2xl font-bold">TVs</h2>
+        <div className="flex gap-2">
+          <button onClick={()=>reloadTVs(null)} className="border border-gray-200 hover:border-orange-300 hover:text-orange-600 text-gray-500 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center gap-1.5" title="Recarregar todas as TVs">🔄 Recarregar todas</button>
+          <button onClick={()=>open()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">+ Nova TV</button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        {tvs.map(tv=>(
+          <div key={tv.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 fadein">
+            <div className="flex items-start justify-between mb-3">
+              <div className="min-w-0"><h3 className="font-semibold truncate">{tv.name}</h3><p className="text-xs text-gray-400 font-mono truncate">{tv.id}</p></div>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ml-2 ${tv.status==='online'?'badge-online':'badge-offline'}`}>{tv.status==='online'?'● Online':'○ Offline'}</span>
+            </div>
+            {tv.status==='online'&&tv.current_video&&<div className="bg-blue-50 rounded-lg p-2 mb-3"><p className="text-xs text-blue-600 font-medium">▶ Agora</p><p className="text-xs text-blue-800 truncate">{tv.current_video}</p></div>}
+            <div className="text-xs space-y-1 mb-3 text-gray-500">
+              <div className="flex justify-between"><span>Playlist</span><span className="font-medium text-gray-700 truncate max-w-32">{getPl(tv.playlist_id)}</span></div>
+              <div className="flex justify-between"><span>Orientação</span><span className="font-medium text-gray-700">{tv.orientation==='vertical'||tv.orientation==='portrait-left'?'↕ Retrato ←':tv.orientation==='portrait-right'?'↕ Retrato →':'↔ Paisagem'}</span></div>
+              <div className="flex justify-between"><span>Volume</span><span className="font-medium text-gray-700">{tv.volume??100}%</span></div>
+              <div className="flex justify-between"><span>Transição</span><span className="font-medium text-gray-700 capitalize">{tv.transition||'fade'}</span></div>
+              <div className="flex justify-between"><span>Último ping</span><span>{fmt.time(tv.last_seen)}</span></div>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              <button onClick={()=>open(tv)} className="flex-1 text-xs border border-gray-200 hover:border-blue-300 hover:text-blue-600 py-1.5 rounded-lg transition">✏️ Editar</button>
+              <button onClick={()=>setPreviewTv(tv)} className="flex-1 text-xs border border-gray-200 hover:border-purple-300 hover:text-purple-600 py-1.5 rounded-lg transition">👁 Preview</button>
+              <button onClick={()=>reloadTVs(tv.id)} title="Recarregar esta TV" className="text-xs border border-gray-200 hover:border-orange-300 hover:text-orange-600 px-2.5 py-1.5 rounded-lg transition">🔄</button>
+              <button onClick={()=>{navigator.clipboard.writeText(tv.id);showToast('ID copiado!');}} className="text-xs border border-gray-200 px-2.5 py-1.5 rounded-lg transition hover:border-gray-300">📋</button>
+              <button onClick={()=>del(tv.id)} className="text-xs text-red-400 border border-gray-200 hover:border-red-300 px-2.5 py-1.5 rounded-lg transition">🗑</button>
+            </div>
+          </div>
+        ))}
+        {tvs.length===0&&<div className="col-span-3 text-center py-16 text-gray-400"><div className="text-4xl mb-3">📺</div><p>Nenhuma TV cadastrada</p><button onClick={()=>open()} className="mt-2 text-blue-500 text-sm">Criar agora</button></div>}
+      </div>
+
+      {/* Modal editar TV */}
+      {modal&&<Modal title={edit?'Editar TV':'Nova TV'} onClose={()=>setModal(false)} onSave={save}>
+        <Lbl>Nome</Lbl><Inp value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} placeholder="Ex: Recepção"/>
+        <Lbl>Orientação</Lbl>
+        <Sel value={form.orientation} onChange={v=>setForm(f=>({...f,orientation:v}))}>
+          <option value="horizontal">↔ Paisagem (horizontal)</option>
+          <option value="vertical">↕ Retrato — girar esquerda (−90°)</option>
+          <option value="portrait-right">↕ Retrato — girar direita (+90°)</option>
+        </Sel>
+        <Lbl>Playlist padrão</Lbl>
+        <Sel value={form.playlist_id} onChange={v=>setForm(f=>({...f,playlist_id:v}))}>
+          <option value="">— Sem playlist —</option>
+          {playlists.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+        </Sel>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Lbl>Volume padrão: {form.volume}%</Lbl>
+            <input type="range" min="0" max="100" value={form.volume} onChange={e=>setForm(f=>({...f,volume:+e.target.value}))} className="w-full mb-3"/>
+          </div>
+          <div>
+            <Lbl>Transição entre mídias</Lbl>
+            <Sel value={form.transition} onChange={v=>setForm(f=>({...f,transition:v}))}>
+              <option value="fade">🌅 Fade</option>
+              <option value="right">➡️ Slide direita</option>
+              <option value="left">⬅️ Slide esquerda</option>
+              <option value="zoom">🔍 Zoom</option>
+              <option value="none">⚡ Nenhuma</option>
+            </Sel>
+          </div>
+        </div>
+        {edit&&<div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 mt-1">
+          <p className="font-semibold mb-1">URL do player:</p>
+          <p className="font-mono break-all">{playerUrl(edit.id)}</p>
+          <p className="mt-1 opacity-70">Abra esta URL no navegador da TV</p>
+        </div>}
+      </Modal>}
+
+      {/* Preview da TV */}
+      {previewTv&&<Modal title={`👁 Preview — ${previewTv.name}`} onClose={()=>setPreviewTv(null)} xl>
+        <div className="rounded-xl overflow-hidden bg-black" style={{aspectRatio:'16/9',width:'100%'}}>
+          <iframe src={`/player.html?tv=${previewTv.id}&preview=1`} className="w-full h-full border-none" title="Preview"/>
+        </div>
+        <p className="text-xs text-gray-400 text-center mt-2">Preview ao vivo da TV — atualizações em tempo real</p>
+      </Modal>}
+    </div>
+  );
+}
+
+// ── VÍDEOS ───────────────────────────────────────────────────────
+function VideosPage({videos,onUpdate,showToast}){
+  const [uploading,setUploading]=useState(false);const [progress,setProgress]=useState(0);
+  const [displayDur,setDisplayDur]=useState(10);const fileRef=useRef();
+  const [editV,setEditV]=useState(null);const [editName,setEditName]=useState('');const [editDur,setEditDur]=useState(10);const [editRot,setEditRot]=useState(0);
+  const [showYt,setShowYt]=useState(false);const [ytUrl,setYtUrl]=useState('');const [ytName,setYtName]=useState('');
+  const [dragOver,setDragOver]=useState(false);const [filter,setFilter]=useState('all');
+  const [showFileBrowser,setShowFileBrowser]=useState(false);
+  const [fbDrives,setFbDrives]=useState([]);const [fbPath,setFbPath]=useState(null);
+  const [fbData,setFbData]=useState(null);const [fbLoading,setFbLoading]=useState(false);
+  // fbSelected: Set de paths de arquivos individuais selecionados
+  const [fbSelected,setFbSelected]=useState(new Set());
+  // fbSelFolders: Set de paths de pastas selecionadas (inteiras)
+  const [fbSelFolders,setFbSelFolders]=useState(new Set());
+  const [fbImporting,setFbImporting]=useState(false);
+  const [fbScanLoading,setFbScanLoading]=useState(new Set()); // pastas em scan
+
+  const fbOpen=async()=>{
+    try{
+      const r=await api._f('/api/files/drives');
+      const d=await r.json();
+      setFbDrives(d.drives||[]);
+      const first=d.drives?.[0]?.path||'/';
+      setFbPath(first);setFbData(null);
+      setFbSelected(new Set());setFbSelFolders(new Set());
+      setShowFileBrowser(true);
+      fbNavigate(first);
+    }catch(e){showToast('Erro ao abrir explorador: '+e.message,'error');}
+  };
+
+  const fbNavigate=async(p)=>{
+    setFbLoading(true);setFbPath(p);setFbData(null);
+    try{
+      const r=await api._f('/api/files/ls?path='+encodeURIComponent(p));
+      const d=await r.json();
+      if(d.error){showToast(d.error,'error');setFbLoading(false);return;}
+      setFbData(d);
+    }catch(e){showToast('Erro: '+e.message,'error');}
+    setFbLoading(false);
+  };
+
+  // Selecionar/deselecionar arquivo individual
+  const fbToggleFile=f=>setFbSelected(s=>{
+    const n=new Set(s);
+    n.has(f.path)?n.delete(f.path):n.add(f.path);
+    return n;
+  });
+
+  // Selecionar/deselecionar pasta inteira (com scan recursivo)
+  const fbToggleFolder=async(folder)=>{
+    const isSelected=fbSelFolders.has(folder.path);
+    if(isSelected){
+      // Deselecionar — remover todos os arquivos desta pasta do set
+      setFbSelFolders(s=>{const n=new Set(s);n.delete(folder.path);return n;});
+      // Remover arquivos desta pasta dos selecionados (prefixo do path)
+      setFbSelected(s=>{
+        const n=new Set(s);
+        for(const p of n){ if(p.startsWith(folder.path)) n.delete(p); }
+        return n;
+      });
+      return;
+    }
+    // Selecionar — fazer scan recursivo para obter todos os áudios
+    setFbScanLoading(s=>{const n=new Set(s);n.add(folder.path);return n;});
+    try{
+      const r=await api._f('/api/files/scan?path='+encodeURIComponent(folder.path));
+      const d=await r.json();
+      if(d.audios?.length){
+        setFbSelFolders(s=>{const n=new Set(s);n.add(folder.path);return n;});
+        setFbSelected(s=>{const n=new Set(s);d.audios.forEach(a=>n.add(a.path));return n;});
+        showToast('📁 '+d.audios.length+' músicas de "'+folder.name+'" selecionadas');
+      }else{
+        showToast('Nenhuma música encontrada em "'+folder.name+'"','error');
+      }
+    }catch(e){showToast('Erro ao escanear pasta','error');}
+    setFbScanLoading(s=>{const n=new Set(s);n.delete(folder.path);return n;});
+  };
+
+  // Selecionar/deselecionar todos os arquivos da pasta atual
+  const fbToggleAllCurrent=()=>{
+    const audios=fbData?.audios||[];
+    const allSelected=audios.every(a=>fbSelected.has(a.path));
+    setFbSelected(s=>{
+      const n=new Set(s);
+      audios.forEach(a=>allSelected?n.delete(a.path):n.add(a.path));
+      return n;
+    });
+  };
+
+  const fbTotalSelected=fbSelected.size;
+
+  const fbImport=async()=>{
+    if(!fbSelected.size)return;setFbImporting(true);
+    // Precisamos dos objetos completos — juntar de fbData e das pastas selecionadas
+    // Enviamos apenas path e name; o servidor cuida do resto
+    const files=[...fbSelected].map(p=>({path:p,name:p.split(/[\/]/).pop()}));
+    try{
+      const r=await api._f('/api/files/import',{method:'POST',body:JSON.stringify({files})});
+      const d=await r.json();
+      setFbImporting(false);setShowFileBrowser(false);
+      setFbSelected(new Set());setFbSelFolders(new Set());
+      onUpdate();
+      showToast('✅ '+(d.imported||0)+' música(s) importada(s)!');
+    }catch(e){setFbImporting(false);showToast('Erro: '+e.message,'error');}
+  };
+  const [encodeJob,setEncodeJob]=useState(null); // {jobId, progress, status, rot}
+  const encodeIntervalRef=useRef(null);
+
+  const upload=async files=>{
+    if(!files?.length)return;setUploading(true);
+    for(let i=0;i<files.length;i++){setProgress(Math.round((i+1)/files.length*100));await api.uploadVideo(files[i],displayDur);}
+    setProgress(100);setTimeout(()=>{setUploading(false);setProgress(0);},500);
+    onUpdate();showToast(`${files.length} arquivo(s) enviado(s)!`);
+  };
+  const saveYt=async()=>{const r=await api.addYoutube(ytUrl,ytName);if(r.error){showToast(r.error,'error');return;}setShowYt(false);setYtUrl('');setYtName('');onUpdate();showToast('YouTube adicionado!');};
+  const saveEdit=async()=>{await api.patchVideo(editV.id,{original_name:editName,display_duration:editDur,rotation:editRot});setEditV(null);onUpdate();showToast('Atualizado!');};
+  const del=async id=>{if(!confirm('Remover mídia?'))return;await api.deleteVideo(id);onUpdate();showToast('Removido');};
+  const ytId=url=>{const m=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/);return m?m[1]:null;};
+  const badge=v=>v.media_type==='youtube'&&v.mime_type==='youtube_playlist'?{bg:'bg-red-700',l:'📋 YT List'}:v.media_type==='youtube'?{bg:'bg-red-500',l:'▶ YT'}:v.media_type==='image'?{bg:'bg-purple-500',l:'🖼 IMG'}:v.media_type==='pdf'?{bg:'bg-orange-500',l:'📄 PDF'}:v.media_type==='audio'?{bg:'bg-green-600',l:'🎵 MP3'}:{bg:'bg-blue-500',l:'🎬 VID'};
+  const filtered=videos.filter(v=>filter==='all'||v.media_type===filter);
+
+  const startEncode=async(videoId, rot)=>{
+    if(!rot){showToast('Selecione uma rotação antes de re-encode.','error');return;}
+    if(!confirm(`Re-encodar o vídeo com ${rot}° permanentemente? O arquivo original será substituído.`))return;
+    const r=await api.encodeRotate(videoId, rot);
+    if(r.error){showToast(r.error,'error');return;}
+    const job={jobId:r.jobId,progress:0,status:'running',rot};
+    setEncodeJob(job);
+    setEditV(null); // fecha o modal de edição
+    showToast('Re-encode iniciado! Acompanhe o progresso.');
+    encodeIntervalRef.current=setInterval(async()=>{
+      const s=await api.checkEncodeJob(r.jobId);
+      setEncodeJob(j=>({...j,progress:s.progress,status:s.status,error:s.error}));
+      if(s.status==='done'){
+        clearInterval(encodeIntervalRef.current);
+        onUpdate();showToast('✅ Vídeo re-encodado com sucesso! A rotação foi aplicada no arquivo.');
+        setTimeout(()=>setEncodeJob(null),3000);
+      } else if(s.status==='error'){
+        clearInterval(encodeIntervalRef.current);
+        showToast('Erro no re-encode: '+(s.error||'desconhecido'),'error');
+        setTimeout(()=>setEncodeJob(null),5000);
+      }
+    },1500);
+  };
+
+  return (
+    <div className="p-4 md:p-6 fadein">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl md:text-2xl font-bold">Mídias</h2>
+        <div className="flex items-center gap-1.5">
+          <label className="text-xs text-gray-500 hidden md:block">Img/PDF (s):</label>
+          <input type="number" min="3" max="120" value={displayDur} onChange={e=>setDisplayDur(+e.target.value)} className="w-12 border border-gray-200 rounded-lg px-1.5 py-1 text-sm text-center"/>
+          <button onClick={()=>setShowYt(true)} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">▶ YT</button>
+          <button onClick={fbOpen} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">📁 Pasta</button>
+          <button onClick={()=>fileRef.current.click()} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">+ Upload</button>
+        </div>
+      </div>
+      {/* Filtros */}
+      <div className="flex gap-1.5 mb-3">
+        {[['all','Todos'],['video','Vídeos'],['audio','Áudio'],['image','Imagens'],['pdf','PDFs'],['youtube','YouTube']].map(([v,l])=>(
+          <button key={v} onClick={()=>setFilter(v)} className={`px-2.5 py-1 rounded-lg text-xs transition ${filter===v?'bg-blue-600 text-white':'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'}`}>{l}</button>
+        ))}
+      </div>
+      <div className={`border-2 border-dashed rounded-xl p-4 text-center mb-4 cursor-pointer transition ${dragOver?'border-blue-400 bg-blue-50':'border-gray-200 hover:border-blue-300'}`}
+        onClick={()=>fileRef.current.click()} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)}
+        onDrop={e=>{e.preventDefault();setDragOver(false);upload(e.dataTransfer.files);}}>
+        <div className="text-2xl mb-1">{dragOver?'📥':'🎬'}</div>
+        <p className="text-gray-500 text-sm">Arraste ou clique para enviar</p>
+        <p className="text-gray-400 text-xs">Vídeos · Imagens · PDFs · até 500MB</p>
+      </div>
+      <input ref={fileRef} type="file" multiple accept="video/*,image/*,application/pdf" className="hidden" onChange={e=>upload(e.target.files)}/>
+      {uploading&&<div className="bg-blue-50 rounded-xl p-3 mb-4 flex items-center gap-3"><div className="flex-1 bg-blue-200 rounded-full h-2"><div className="bg-blue-600 h-2 rounded-full transition-all" style={{width:`${progress}%`}}></div></div><span className="text-blue-700 text-sm">{progress}%</span></div>}
+      {/* Progress bar de re-encode */}
+      {encodeJob&&<div className={`rounded-xl p-3 mb-4 ${encodeJob.status==='error'?'bg-red-50 border border-red-200':'bg-blue-50 border border-blue-100'}`}>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm font-semibold text-blue-700">
+            {encodeJob.status==='done'?'✅ Re-encode concluído!':encodeJob.status==='error'?'❌ Erro no re-encode':`⚙️ Re-encodando vídeo (↻${encodeJob.rot}°)…`}
+          </span>
+          <span className="text-xs text-blue-500 font-mono">{encodeJob.progress}%</span>
+        </div>
+        {encodeJob.status==='running'&&<div className="bg-blue-200 rounded-full h-2"><div className="bg-blue-600 h-2 rounded-full transition-all" style={{width:`${encodeJob.progress}%`}}></div></div>}
+        {encodeJob.status==='error'&&<p className="text-xs text-red-600 mt-1">{encodeJob.error}</p>}
+        <p className="text-xs text-blue-400 mt-1">O arquivo será substituído. As TVs atualizarão automaticamente.</p>
+      </div>}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+        {filtered.map(v=>{const b=badge(v);return(
+          <div key={v.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden group fadein">
+            <div className="relative bg-gray-900 h-24 flex items-center justify-center overflow-hidden">
+              {v.media_type==='audio'?<div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-green-900 to-emerald-800 gap-1"><span className="text-3xl">🎵</span><span className="text-white text-xs font-bold">MP3</span></div>:v.media_type==='youtube'?v.mime_type==='youtube_playlist'?<div className="w-full h-full flex flex-col items-center justify-center bg-red-900 gap-1"><span className="text-2xl">📋</span><span className="text-white text-xs font-bold">Playlist YT</span></div>:<><img src={`https://img.youtube.com/vi/${v.filename}/mqdefault.jpg`} className="w-full h-full object-cover opacity-90"/><div className="absolute inset-0 flex items-center justify-center"><div className="bg-red-600 rounded-full w-7 h-7 flex items-center justify-center text-white text-xs">▶</div></div></>
+              :v.media_type==='image'?<img src={`/storage/videos/${v.filename}`} className="w-full h-full object-cover"/>
+              :v.media_type==='pdf'?<div className="text-4xl">📄</div>
+              :<div className="relative w-full h-full"><video className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition" src={`/storage/videos/${v.filename}`} muted preload="metadata" onMouseEnter={e=>e.target.play()} onMouseLeave={e=>{e.target.pause();e.target.currentTime=0;}}/></div>}
+              <div className="absolute top-1 left-1 flex gap-1">
+                <span className={`px-1.5 py-0.5 rounded text-xs font-medium text-white ${b.bg}`}>{b.l}</span>
+                {(v.rotation||0)!==0&&<span className="px-1.5 py-0.5 rounded text-xs font-medium text-white bg-amber-500">↻{v.rotation}°</span>}
+              </div>
+            </div>
+            <div className="p-2">
+              <p className="text-xs font-medium text-gray-800 truncate">{v.original_name}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{v.media_type==='audio'?'Áudio MP3':v.media_type==='youtube'?v.mime_type==='youtube_playlist'?'Playlist YouTube':'YouTube':v.media_type==='image'||v.media_type==='pdf'?`${v.display_duration||10}s`:fmt.dur(v.duration)} · {fmt.size(v.size||0)}</p>
+              <div className="flex gap-1 mt-1.5">
+                <button onClick={()=>{setEditV(v);setEditName(v.original_name);setEditDur(v.display_duration||10);setEditRot(v.rotation||0);}} className="flex-1 text-xs text-gray-500 hover:text-blue-600 border border-gray-100 py-1 rounded transition">✏️</button>
+                <button onClick={()=>del(v.id)} className="flex-1 text-xs text-gray-500 hover:text-red-500 border border-gray-100 py-1 rounded transition">🗑️</button>
+              </div>
+            </div>
+          </div>
+        );})}
+        {filtered.length===0&&!uploading&&<div className="col-span-5 text-center py-12 text-gray-400"><div className="text-3xl mb-2">🎬</div><p>Nenhuma mídia</p></div>}
+      </div>
+      {editV&&<Modal title="Editar Mídia" onClose={()=>setEditV(null)} onSave={saveEdit}>
+        <Lbl>Nome</Lbl><Inp value={editName} onChange={setEditName}/>
+        {(editV.media_type==='image'||editV.media_type==='pdf')&&<><Lbl>Tempo de exibição (s)</Lbl><input type="number" min="3" max="300" value={editDur} onChange={e=>setEditDur(+e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/></>}
+        <Lbl>Rotação individual na TV</Lbl>
+          <p className="text-xs text-gray-400 mb-2">0° = sem rotação. Configure aqui a rotação individual desta mídia.</p>
+          <div className="grid grid-cols-4 gap-2 mb-1">
+            {[{v:0,l:'0°'},{v:90,l:'90°'},{v:180,l:'180°'},{v:270,l:'270°'}].map(({v,l})=>(
+              <button key={v} type="button" onClick={()=>setEditRot(v)}
+                className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 text-xs font-semibold transition ${editRot===v?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 bg-white text-gray-500 hover:border-blue-300'}`}>
+                <span style={{display:'inline-block',transform:`rotate(${v}deg)`,fontSize:16,lineHeight:1,marginBottom:2}}>▶</span>
+                {l}
+              </button>
+            ))}
+          </div>
+          {editRot!==0&&<p className="text-xs text-amber-600 mt-1 mb-1">↻ Esta mídia girará {editRot}° na TV.</p>}
+        {editV.media_type==='video'&&editRot!==0&&<>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-2">
+              <p className="text-xs font-semibold text-orange-800 mb-1">📺 TV Samsung com Tizen antigo?</p>
+              <p className="text-xs text-orange-700 mb-2">CSS transform não funciona para vídeo no Tizen. Use o re-encode para <strong>queimar a rotação no arquivo</strong> — a TV toca normalmente sem precisar de nenhum truque CSS.</p>
+              <button type="button" onClick={()=>startEncode(editV.id, editRot)}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 rounded-lg text-xs font-semibold transition">
+                ⚙️ Re-encodar com {editRot}° permanentemente
+              </button>
+            </div>
+          </div>
+        </>}
+      </Modal>}
+      {/* ── Modal: Importar músicas da pasta ── */}
+      {showFileBrowser&&<Modal title="📁 Importar Músicas" onClose={()=>{setShowFileBrowser(false);setFbSelected(new Set());setFbSelFolders(new Set());}} onSave={fbImport} saveLabel={fbImporting?'Importando...':fbTotalSelected>0?`Importar ${fbTotalSelected} música(s)`:'Selecione músicas ou pastas'} wide>
+        {/* Drives */}
+        {fbDrives.length>1&&<div className="flex gap-1.5 mb-3 flex-wrap">
+          {fbDrives.map(d=><button key={d.path} onClick={()=>fbNavigate(d.path)} className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold border transition ${fbPath?.startsWith(d.path)?'bg-blue-600 text-white border-blue-600':'bg-white border-gray-200 hover:border-blue-300'}`}>{d.label}</button>)}
+        </div>}
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 mb-3 text-xs font-mono text-gray-600 overflow-x-auto">
+          <span>📂</span>
+          <span className="truncate flex-1">{fbPath||'...'}</span>
+          {fbData?.parent&&<button onClick={()=>fbNavigate(fbData.parent)} className="text-blue-500 hover:text-blue-700 flex-shrink-0 font-sans font-semibold whitespace-nowrap">⬆ Voltar</button>}
+        </div>
+        {fbLoading&&<div className="text-center py-8 text-gray-400 text-sm">⏳ Carregando...</div>}
+        {fbData&&!fbLoading&&<div className="space-y-3">
+          {/* Pastas — clique navega, checkbox seleciona toda a pasta */}
+          {fbData.folders.length>0&&<div>
+            <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2">Pastas</p>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {fbData.folders.map(folder=>{
+                const isSel=fbSelFolders.has(folder.path);
+                const isScanning=fbScanLoading.has(folder.path);
+                return(
+                  <div key={folder.path} className={`flex items-center gap-2 rounded-lg border transition ${isSel?'bg-yellow-50 border-yellow-300':'border-gray-100 hover:border-gray-200 hover:bg-gray-50'}`}>
+                    {/* Checkbox para selecionar pasta inteira */}
+                    <button onClick={(e)=>{e.stopPropagation();fbToggleFolder(folder);}} disabled={isScanning}
+                      className={`w-8 h-full flex items-center justify-center flex-shrink-0 rounded-l-lg transition ${isSel?'bg-yellow-400':'hover:bg-gray-100'}`}>
+                      {isScanning?<span className="text-xs animate-spin">⏳</span>
+                        :<span className={`w-4 h-4 rounded border flex items-center justify-center text-xs ${isSel?'bg-yellow-500 border-yellow-500 text-white':'border-gray-300'}`}>{isSel?'✓':''}</span>}
+                    </button>
+                    {/* Clique no nome navega para dentro */}
+                    <button onClick={()=>fbNavigate(folder.path)} className="flex items-center gap-2 flex-1 py-2 pr-3 text-left min-w-0">
+                      <span className="text-lg flex-shrink-0">{isSel?'📂':'📁'}</span>
+                      <span className="text-xs font-medium truncate">{folder.name}</span>
+                      {folder.audioCount>0&&<span className="ml-auto text-xs text-gray-400 flex-shrink-0">{folder.audioCount} 🎵</span>}
+                      <span className="text-gray-300 text-xs flex-shrink-0">›</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>}
+          {/* Arquivos de áudio na pasta atual */}
+          {fbData.audios.length>0?<div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Músicas aqui ({fbData.audios.length})</p>
+              <button onClick={fbToggleAllCurrent} className="text-xs text-blue-500 hover:text-blue-700 font-medium">
+                {fbData.audios.every(a=>fbSelected.has(a.path))?'Desmarcar tudo':'Selecionar tudo'}
+              </button>
+            </div>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {fbData.audios.map(f=>{const sel=fbSelected.has(f.path);return(
+                <div key={f.path} onClick={()=>fbToggleFile(f)} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer border transition ${sel?'bg-green-50 border-green-300':'border-transparent hover:bg-gray-50'}`}>
+                  <span className={`w-4 h-4 rounded border flex items-center justify-center text-xs flex-shrink-0 ${sel?'bg-green-500 border-green-500 text-white':'border-gray-300'}`}>{sel?'✓':''}</span>
+                  <span className="text-base">🎵</span>
+                  <span className="text-xs truncate flex-1">{f.name}</span>
+                  <span className="text-xs text-gray-400 flex-shrink-0">{(f.size/1024/1024).toFixed(1)}MB</span>
+                </div>
+              );})}
+            </div>
+          </div>:fbData.folders.length===0&&<div className="text-center py-8 text-gray-400">
+            <div className="text-3xl mb-2">📭</div><p className="text-sm">Pasta vazia</p>
+          </div>}
+        </div>}
+        {/* Rodapé com contagem total selecionada */}
+        {fbTotalSelected>0&&<div className="mt-4 bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-green-700">🎵 {fbTotalSelected} música(s) selecionada(s)</p>
+            {fbSelFolders.size>0&&<p className="text-xs text-green-500 mt-0.5">{fbSelFolders.size} pasta(s) completa(s) incluída(s)</p>}
+          </div>
+          <button onClick={()=>{setFbSelected(new Set());setFbSelFolders(new Set());}} className="text-xs text-green-600 hover:text-green-800 font-medium border border-green-300 rounded-lg px-2 py-1">Limpar</button>
+        </div>}
+      </Modal>}
+
+      {showYt&&<Modal title="▶ Adicionar YouTube" onClose={()=>{setShowYt(false);setYtUrl('');}} onSave={saveYt}>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-3 text-xs text-yellow-800">⚠️ Vídeos com restrição de incorporação não funcionarão.</div>
+        <Lbl>URL do YouTube ou Playlist</Lbl><Inp value={ytUrl} onChange={setYtUrl} placeholder="youtube.com/watch?v=... ou /playlist?list=..."/>
+        {ytUrl&&(()=>{
+  const plMatch=ytUrl.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+  if(plMatch)return <div className="mb-3 p-3 bg-red-50 rounded-lg"><p className="text-sm font-semibold text-red-700">📋 Playlist detectada</p><p className="text-xs text-red-500 mt-1">ID: {plMatch[1]}</p><p className="text-xs text-gray-500 mt-1">Todos os vídeos da playlist serão reproduzidos em sequência</p></div>;
+  const id=ytId(ytUrl);
+  return id?<div className="mb-3"><img src={`https://img.youtube.com/vi/${id}/mqdefault.jpg`} className="w-full rounded-lg"/><p className="text-xs text-green-600 mt-1">✅ Vídeo: {id}</p></div>:<p className="text-xs text-red-500 mb-3">URL inválida</p>;
+})()}
+        <Lbl>Nome (opcional)</Lbl><Inp value={ytName} onChange={setYtName} placeholder="Ex: Vídeo institucional"/>
+      </Modal>}
+    </div>
+  );
+}
+
+// ── PLAYLISTS ────────────────────────────────────────────────────
+// ── Verificador de Cidade (cards de clima) ───────────────────────
+function CityVerifier({cardForm, setCardForm}){
+  const [status,setStatus]=useState(null); // null | 'loading' | 'ok' | 'error'
+  const [results,setResults]=useState([]);
+
+  const set=(k,v)=>setCardForm(f=>({...f,[k]:v}));
+
+  const verify=async()=>{
+    const city=(cardForm.city||'').trim();
+    if(!city)return;
+    setStatus('loading');setResults([]);
+    try{
+      const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=8&language=pt&format=json`);
+      const j=await r.json();
+      let rs=(j.results||[]);
+      // Priorizar Brasil
+      const br=rs.filter(x=>x.country_code==='BR');
+      let list=br.length?br:rs;
+      // Filtrar por estado se informado
+      const st=(cardForm.state||'').toUpperCase().trim();
+      if(st&&br.length>1){
+        const filtered=br.filter(x=>(x.admin1||'').toUpperCase().includes(st)||(x.admin1_code||'').toUpperCase().includes(st));
+        if(filtered.length)list=filtered;
+      }
+      setResults(list.slice(0,5));
+      setStatus(list.length?'ok':'error');
+    }catch{setStatus('error');setResults([]);}
+  };
+
+  const pick=(r)=>{
+    set('city',r.name);
+    set('state',r.admin1||'');
+    set('_lat',r.latitude);
+    set('_lon',r.longitude);
+    setStatus(null);setResults([]);
+  };
+
+  const confirmed = cardForm._lat && cardForm._lon;
+
+  return(<>
+    <div className="grid grid-cols-2 gap-2">
+      <div>
+        <Lbl>Cidade</Lbl>
+        <Inp value={cardForm.city||''} onChange={v=>{set('city',v);set('_lat',null);set('_lon',null);setStatus(null);setResults([]);}} placeholder="Ex: Belém"/>
+      </div>
+      <div>
+        <Lbl>Estado (opcional)</Lbl>
+        <Inp value={cardForm.state||''} onChange={v=>{set('state',v);set('_lat',null);set('_lon',null);setStatus(null);setResults([]);}} placeholder="Ex: PA"/>
+      </div>
+    </div>
+
+    {/* Botão verificar */}
+    <button
+      type="button"
+      onClick={verify}
+      disabled={status==='loading'||!(cardForm.city||'').trim()}
+      className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border-2 transition mb-2 disabled:opacity-40"
+      style={{
+        borderColor: confirmed?'#16a34a':status==='error'?'#dc2626':'#3b82f6',
+        background:  confirmed?'#f0fdf4':status==='error'?'#fef2f2':'#eff6ff',
+        color:       confirmed?'#15803d':status==='error'?'#b91c1c':'#1d4ed8',
+      }}>
+      {status==='loading'
+        ? <><span className="inline-block animate-spin">⏳</span>Buscando...</>
+        : confirmed
+          ? <>✅ Confirmada: {cardForm.city}{cardForm.state?`, ${cardForm.state}`:''}</>
+          : status==='error'
+            ? <>❌ Cidade não encontrada — tente outro nome</>
+            : <>🔍 Verificar cidade</>
+      }
+    </button>
+
+    {/* Lista de resultados */}
+    {results.length>0&&(
+      <div className="border border-blue-200 rounded-xl overflow-hidden mb-3 shadow-sm">
+        <div className="bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+          {results.length} resultado{results.length>1?'s':''} — clique para confirmar
+        </div>
+        {results.map((r,i)=>(
+          <button key={i} type="button" onClick={()=>pick(r)}
+            className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-blue-50 border-t border-blue-100 transition text-left">
+            <div>
+              <div className="text-sm font-semibold text-gray-800">{r.name}</div>
+              <div className="text-xs text-gray-500">
+                {[r.admin2,r.admin1,r.country].filter(Boolean).join(' · ')}
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0 ml-3">
+              <div className="text-xs text-gray-400 font-mono">{r.latitude?.toFixed(2)}°, {r.longitude?.toFixed(2)}°</div>
+              {r.country_code==='BR'&&<span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">🇧🇷 Brasil</span>}
+            </div>
+          </button>
+        ))}
+      </div>
+    )}
+
+    <Lbl>Unidade de temperatura</Lbl>
+    <Sel value={cardForm.unit||'C'} onChange={v=>set('unit',v)}>
+      <option value="C">Celsius (°C)</option>
+      <option value="F">Fahrenheit (°F)</option>
+    </Sel>
+  </>);
+}
+
+function PlaylistsPage({playlists,videos,onUpdate,showToast}){
+  const [modal,setModal]=useState(false);
+  const [edit,setEdit]=useState(null);
+  const [form,setForm]=useState({name:'',videoIds:[]});
+  const [dragIdx,setDragIdx]=useState(null);
+  const [cardModal,setCardModal]=useState(null); // {type, editing, itemId}
+  const [cardForm,setCardForm]=useState({});
+  const [cardSaving,setCardSaving]=useState(false);
+  const [tab,setTab]=useState('media'); // 'media' | 'cards'
+
+  const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const [fbPath, setFbPath] = useState(null);
+  const [fbData, setFbData] = useState(null);
+  const [fbLoading, setFbLoading] = useState(false);
+  const [fbSelected, setFbSelected] = useState([]);
+  const [fbImporting, setFbImporting] = useState(false);
+  const [drives, setDrives] = useState([]);
+
+  const open=(p=null)=>{
+    setEdit(p);
+    setForm(p?{name:p.name,videoIds:p.videos.map(v=>v.id),shuffle:!!(p.shuffle)}:{name:'',videoIds:[],shuffle:false});
+    setTab('media');
+    setModal(true);
+  };
+  const duplicate=async p=>{
+    const newName=`${p.name} (cópia)`;
+    const r=await api.createPlaylist({name:newName,videoIds:p.videos.map(v=>v.id)});
+    if(r.error){showToast(r.error,'error');return;}
+    onUpdate();showToast(`"${newName}" criada!`);
+  };
+  const save=async()=>{
+    if(!form.name.trim())return;
+    edit?await api.updatePlaylist(edit.id,form):await api.createPlaylist(form);
+    setModal(false);onUpdate();showToast(edit?'Salva! TVs notificadas.':'Criada!');
+  };
+  const del=async id=>{if(!confirm('Remover?'))return;await api.deletePlaylist(id);onUpdate();showToast('Removida');};
+  const toggle=id=>setForm(f=>({...f,videoIds:f.videoIds.includes(id)?f.videoIds.filter(v=>v!==id):[...f.videoIds,id]}));
+  const drop=i=>{
+    if(dragIdx===null||dragIdx===i)return;
+    const ids=[...form.videoIds];const[item]=ids.splice(dragIdx,1);ids.splice(i,0,item);
+    setForm(f=>({...f,videoIds:ids}));setDragIdx(null);
+  };
+  const getV=id=>videos.find(v=>v.id===id);
+
+  const CARD_TYPES = [
+    {type:'weather_clock', icon:'🌤⏰', label:'Clima + Hora',       desc:'Previsão do tempo e relógio juntos'},
+    {type:'clock_card',    icon:'⏰',   label:'Relógio',            desc:'Hora e data em tela cheia'},
+    {type:'weather_card',  icon:'🌤',   label:'Previsão do Tempo',  desc:'Temperatura e condição atual'},
+    {type:'slide',         icon:'🖼',   label:'Slide',              desc:'Título, texto, imagem e cores'},
+  ];
+
+  const mediaIcon=v=>{
+    if(!v)return '?';
+    const icons={'youtube':'▶','image':'🖼','pdf':'📄','video':'🎬','audio':'🎵','clock_card':'⏰','weather_card':'🌤','weather_clock':'🌤⏰','slide':'🖼'};
+    return icons[v.media_type]||'🎬';
+  };
+
+  // Abrir modal para criar/editar um card
+  const openCard=(type, existingVideo=null)=>{
+    setCardForm(existingVideo?.config
+      ? {...existingVideo.config, _name:existingVideo.original_name, _dur:existingVideo.display_duration||15, _rotation:existingVideo.rotation||0}
+      : {_name:'', _dur:15, _rotation:0, bg_color:'#0f172a', text_color:'#ffffff'}
+    );
+    setCardModal({type, editing:existingVideo});
+  };
+
+  const saveCard=async()=>{
+    setCardSaving(true);
+    try{
+      const {_name,_dur,_rotation,...config} = cardForm;
+      const name     = _name || CARD_TYPES.find(c=>c.type===cardModal.type)?.label || cardModal.type;
+      const dur      = parseInt(_dur)||15;
+      const rotation = [0,90,180,270].includes(Number(_rotation)) ? Number(_rotation) : 0;
+
+      let newVideo;
+      if(cardModal.editing){
+        const h={};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;h['Content-Type']='application/json';
+        const r=await fetch(`${API}/videos/card/${cardModal.editing.id}`,{method:'PUT',headers:h,body:JSON.stringify({name,config,display_duration:dur,rotation})});
+        newVideo=await r.json();
+      } else {
+        const h={};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;h['Content-Type']='application/json';
+        const r=await fetch(`${API}/videos/card`,{method:'POST',headers:h,body:JSON.stringify({name,media_type:cardModal.type,config,display_duration:dur,rotation})});
+        newVideo=await r.json();
+        if(newVideo.id && !form.videoIds.includes(newVideo.id)){
+          setForm(f=>({...f,videoIds:[...f.videoIds,newVideo.id]}));
+        }
+      }
+      setCardModal(null);
+      onUpdate();
+      showToast('Card salvo!');
+    }catch(e){showToast('Erro: '+e.message,'error');}
+    setCardSaving(false);
+  };
+
+  // Filtrar por tipo no painel de disponíveis
+  const normalMedia = videos.filter(v=>!['clock_card','weather_card','weather_clock','slide'].includes(v.media_type));
+  const cardMedia   = videos.filter(v=>['clock_card','weather_card','weather_clock','slide'].includes(v.media_type));
+
+  return (
+    <div className="p-4 md:p-6 fadein">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-xl md:text-2xl font-bold">Playlists</h2>
+        <button onClick={()=>open()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Nova</button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {playlists.map(p=>(
+          <div key={p.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 fadein">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="font-semibold truncate">{p.name}</h3>
+                {p.shuffle?<span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">🔀 Aleatório</span>:null}
+              </div>
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full flex-shrink-0 ml-2">{p.videos?.length||0} itens</span>
+            </div>
+            <div className="space-y-1 mb-3 max-h-32 overflow-y-auto">
+              {(p.videos||[]).length===0&&<p className="text-xs text-gray-400 py-2 text-center">Vazia</p>}
+              {(p.videos||[]).map((v,i)=>(
+                <div key={v.id} className="flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 rounded px-2 py-1.5">
+                  <span className="text-gray-400 w-4">{i+1}.</span>
+                  <span>{mediaIcon(v)}</span>
+                  <span className="truncate">{v.original_name}</span>
+                  {['clock_card','weather_card','slide'].includes(v.media_type)&&
+                    <span className="ml-auto text-xs bg-blue-100 text-blue-600 px-1.5 rounded-full flex-shrink-0">{v.display_duration}s</span>
+                  }
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-1.5">
+              <button onClick={()=>open(p)} className="flex-1 text-xs border border-gray-200 hover:border-blue-300 hover:text-blue-600 py-1.5 rounded-lg transition">✏️ Editar</button>
+              <button onClick={()=>duplicate(p)} className="flex-1 text-xs border border-gray-200 hover:border-green-300 hover:text-green-600 py-1.5 rounded-lg transition">📋 Duplicar</button>
+              <button onClick={()=>del(p.id)} className="text-xs text-red-400 border border-gray-200 hover:border-red-300 px-3 py-1.5 rounded-lg transition">🗑</button>
+            </div>
+          </div>
+        ))}
+        {playlists.length===0&&<div className="col-span-2 text-center py-12 text-gray-400"><div className="text-3xl mb-2">📋</div><p>Nenhuma playlist</p><button onClick={()=>open()} className="mt-2 text-blue-500 text-sm">Criar agora</button></div>}
+      </div>
+
+      {/* ── MODAL EDIÇÃO DE PLAYLIST ── */}
+      {modal&&<Modal title={edit?`Editar: ${edit.name}`:'Nova Playlist'} onClose={()=>setModal(false)} onSave={save} wide>
+        <div className="mb-3">
+          <Lbl>Nome</Lbl>
+          <Inp value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} placeholder="Ex: Promoções"/>
+        </div>
+
+        {/* Shuffle */}
+        <div className="flex items-center justify-between bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 mb-3">
+          <div>
+            <p className="text-sm font-semibold text-purple-800">🔀 Reprodução aleatória</p>
+            <p className="text-xs text-purple-500 mt-0.5">Embaralha a ordem dos itens automaticamente</p>
+          </div>
+          <button onClick={()=>setForm(f=>({...f,shuffle:!f.shuffle}))} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.shuffle?'bg-purple-600':'bg-gray-200'}`}>
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.shuffle?'translate-x-6':'translate-x-1'}`}/>
+          </button>
+        </div>
+
+        {/* Tabs: Mídia normal vs Cards especiais */}
+        <div className="flex gap-0 mb-3 border border-gray-200 rounded-lg overflow-hidden">
+          <button onClick={()=>setTab('media')} className={`flex-1 py-2 text-sm font-medium transition ${tab==='media'?'bg-blue-600 text-white':'bg-white text-gray-600 hover:bg-gray-50'}`}>
+            🎬 Mídia ({normalMedia.filter(v=>!form.videoIds.includes(v.id)).length} disp.)
+          </button>
+          <button onClick={()=>setTab('cards')} className={`flex-1 py-2 text-sm font-medium transition ${tab==='cards'?'bg-blue-600 text-white':'bg-white text-gray-600 hover:bg-gray-50'}`}>
+            ✨ Cards especiais
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Coluna esquerda — disponíveis (muda conforme tab) */}
+          <div>
+            {tab==='media' ? <>
+              <Lbl>Disponíveis ({normalMedia.filter(v=>!form.videoIds.includes(v.id)).length})</Lbl>
+              <div className="border border-gray-200 rounded-lg overflow-y-auto" style={{maxHeight:280}}>
+                {normalMedia.filter(v=>!form.videoIds.includes(v.id)).map(v=>(
+                  <div key={v.id} onClick={()=>toggle(v.id)} className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 text-xs">
+                    <span>{mediaIcon(v)}</span><span className="truncate flex-1">{v.original_name}</span>
+                    <span className="text-gray-400 flex-shrink-0">{v.media_type==='video'?`${v.duration||'?'}s`:v.media_type}</span>
+                    <span className="text-green-500 font-bold ml-1">+</span>
+                  </div>
+                ))}
+                {normalMedia.filter(v=>!form.videoIds.includes(v.id)).length===0&&<p className="text-xs text-gray-400 text-center py-4">Todas adicionadas</p>}
+              </div>
+            </> : <>
+              <Lbl>Criar novo card</Lbl>
+              <div className="space-y-2">
+                {CARD_TYPES.map(ct=>(
+                  <button key={ct.type} onClick={()=>openCard(ct.type)}
+                    className="w-full flex items-center gap-3 p-3 border-2 border-dashed border-gray-200 hover:border-blue-400 hover:bg-blue-50 rounded-xl transition text-left">
+                    <span className="text-2xl">{ct.icon}</span>
+                    <div>
+                      <div className="text-sm font-semibold text-gray-800">{ct.label}</div>
+                      <div className="text-xs text-gray-500">{ct.desc}</div>
+                    </div>
+                    <span className="ml-auto text-blue-400 text-lg">+</span>
+                  </button>
+                ))}
+              </div>
+              {cardMedia.filter(v=>!form.videoIds.includes(v.id)).length>0&&<>
+                <Lbl className="mt-3">Cards existentes</Lbl>
+                <div className="border border-gray-200 rounded-lg overflow-y-auto" style={{maxHeight:120}}>
+                  {cardMedia.filter(v=>!form.videoIds.includes(v.id)).map(v=>(
+                    <div key={v.id} className="flex items-center gap-1.5 px-2.5 py-2 border-b border-gray-100 last:border-0 text-xs">
+                      <span>{mediaIcon(v)}</span>
+                      <span className="truncate flex-1">{v.original_name}</span>
+                      <button onClick={()=>openCard(v.media_type,v)} className="text-gray-400 hover:text-blue-600 mr-1">✏️</button>
+                      <button onClick={()=>toggle(v.id)} className="text-green-500 font-bold">+</button>
+                    </div>
+                  ))}
+                </div>
+              </>}
+            </>}
+          </div>
+
+          {/* Coluna direita — na playlist (sempre visível) */}
+          <div>
+            <Lbl>Na playlist ({form.videoIds.length}) — arraste para reordenar</Lbl>
+            <div className="border border-gray-200 rounded-lg overflow-y-auto min-h-12" style={{maxHeight:280}}>
+              {form.videoIds.length===0&&<p className="text-xs text-gray-400 text-center py-4">Vazia — adicione itens</p>}
+              {form.videoIds.map((id,i)=>{
+                const v=getV(id);if(!v)return null;
+                return(
+                  <div key={id} draggable
+                    onDragStart={()=>setDragIdx(i)} onDragOver={e=>e.preventDefault()} onDrop={()=>drop(i)}
+                    className={`drag-item flex items-center gap-1.5 px-2.5 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-0 text-xs ${dragIdx===i?'dragging':''}`}>
+                    <span className="text-gray-300 cursor-grab">⠿</span>
+                    <span className="text-gray-400 w-4">{i+1}</span>
+                    <span>{mediaIcon(v)}</span>
+                    <span className="truncate flex-1">{v.original_name}</span>
+                    {['clock_card','weather_card','slide'].includes(v.media_type)&&
+                      <button onClick={()=>openCard(v.media_type,v)} className="text-gray-400 hover:text-blue-600 flex-shrink-0" title="Editar card">✏️</button>
+                    }
+                    <span className="text-gray-400 text-xs flex-shrink-0 mr-1">{v.display_duration||10}s</span>
+                    <button onClick={()=>toggle(id)} className="text-red-400 hover:text-red-600 ml-0.5 text-base leading-none">×</button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Modal>}
+
+      {/* ── MODAL CARD ESPECIAL ── */}
+      {cardModal&&<Modal
+        title={`${CARD_TYPES.find(c=>c.type===cardModal.type)?.icon} ${cardModal.editing?'Editar':'Criar'} ${CARD_TYPES.find(c=>c.type===cardModal.type)?.label}`}
+        onClose={()=>setCardModal(null)}
+        onSave={saveCard}
+        saving={cardSaving}>
+
+        <div className="grid grid-cols-2 gap-2 mb-1">
+          <div>
+            <Lbl>Nome do item</Lbl>
+            <Inp value={cardForm._name||''} onChange={v=>setCardForm(f=>({...f,_name:v}))} placeholder={CARD_TYPES.find(c=>c.type===cardModal.type)?.label}/>
+          </div>
+          <div>
+            <Lbl>Duração (segundos)</Lbl>
+            <input type="number" min="5" max="300" value={cardForm._dur||15} onChange={e=>setCardForm(f=>({...f,_dur:+e.target.value}))}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/>
+          </div>
+        </div>
+
+        {/* Cores */}
+        <div className="grid grid-cols-2 gap-2 mb-1">
+          <div>
+            <Lbl>Cor de fundo</Lbl>
+            <div className="flex gap-2 items-center mb-3">
+              <input type="color" value={cardForm.bg_color||'#0f172a'} onChange={e=>setCardForm(f=>({...f,bg_color:e.target.value}))} className="w-10 h-9 rounded border border-gray-200 cursor-pointer flex-shrink-0"/>
+              <input type="text" value={cardForm.bg_color||''} onChange={e=>setCardForm(f=>({...f,bg_color:e.target.value}))} className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono" placeholder="#0f172a"/>
+            </div>
+          </div>
+          <div>
+            <Lbl>Cor do texto</Lbl>
+            <div className="flex gap-2 items-center mb-3">
+              <input type="color" value={cardForm.text_color||'#ffffff'} onChange={e=>setCardForm(f=>({...f,text_color:e.target.value}))} className="w-10 h-9 rounded border border-gray-200 cursor-pointer flex-shrink-0"/>
+              <input type="text" value={cardForm.text_color||''} onChange={e=>setCardForm(f=>({...f,text_color:e.target.value}))} className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono" placeholder="#ffffff"/>
+            </div>
+          </div>
+        </div>
+
+        {/* Gradiente opcional */}
+        <Lbl>Gradiente do texto (opcional)</Lbl>
+        <Inp value={cardForm.gradient||''} onChange={v=>setCardForm(f=>({...f,gradient:v}))} placeholder="Ex: linear-gradient(135deg,#f59e0b,#ef4444)"/>
+
+        {/* Campos específicos por tipo */}
+        {(cardModal.type==='weather_clock'||cardModal.type==='weather_card')&&<CityVerifier cardForm={cardForm} setCardForm={setCardForm}/>}
+
+        {(cardModal.type==='weather_clock'||cardModal.type==='clock_card')&&<>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Lbl>Formato do relógio</Lbl>
+              <Sel value={cardForm.format||'24h'} onChange={v=>setCardForm(f=>({...f,format:v}))}>
+                <option value="24h">24 horas (13:45)</option>
+                <option value="12h">12 horas (1:45 PM)</option>
+              </Sel>
+            </div>
+            <div>
+              <Lbl>Mostrar data</Lbl>
+              <Sel value={cardForm.show_date===false?'no':'yes'} onChange={v=>setCardForm(f=>({...f,show_date:v==='yes'}))}>
+                <option value="yes">Sim</option>
+                <option value="no">Não</option>
+              </Sel>
+            </div>
+          </div>
+          {cardModal.type==='weather_clock'&&<>
+            <Lbl>Layout</Lbl>
+            <Sel value={cardForm.layout||'side'} onChange={v=>setCardForm(f=>({...f,layout:v}))}>
+              <option value="side">Lado a lado (clima ← | → hora)</option>
+              <option value="stack">Empilhado (clima em cima, hora embaixo)</option>
+            </Sel>
+          </>}
+          {cardModal.type==='clock_card'&&<>
+            <Lbl>Legenda (opcional)</Lbl>
+            <Inp value={cardForm.label||''} onChange={v=>setCardForm(f=>({...f,label:v}))} placeholder="Ex: HORÁRIO DE BRASÍLIA"/>
+          </>}
+        </>}
+
+        {cardModal.type==='slide'&&<>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Lbl>Ícone/Emoji</Lbl>
+              <Inp value={cardForm.icon||''} onChange={v=>setCardForm(f=>({...f,icon:v}))} placeholder="Ex: 🎉 ou 💼"/>
+            </div>
+            <div>
+              <Lbl>Layout</Lbl>
+              <Sel value={cardForm.layout||'center'} onChange={v=>setCardForm(f=>({...f,layout:v}))}>
+                <option value="center">Centralizado</option>
+                <option value="right">Imagem à direita</option>
+                <option value="bg">Imagem de fundo</option>
+              </Sel>
+            </div>
+          </div>
+          <Lbl>Título</Lbl>
+          <Inp value={cardForm.title||''} onChange={v=>setCardForm(f=>({...f,title:v}))} placeholder="Ex: Grande Promoção!"/>
+          <Lbl>Subtítulo</Lbl>
+          <Inp value={cardForm.subtitle||''} onChange={v=>setCardForm(f=>({...f,subtitle:v}))} placeholder="Ex: Só hoje até 22h"/>
+          <Lbl>Texto do corpo</Lbl>
+          <textarea value={cardForm.body||''} onChange={e=>setCardForm(f=>({...f,body:e.target.value}))}
+            placeholder="Descrição, detalhes, preço, endereço..." rows={2}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm resize-none focus:outline-none focus:border-blue-400"/>
+          <Lbl>URL da imagem (opcional)</Lbl>
+          <Inp value={cardForm.image_url||''} onChange={v=>setCardForm(f=>({...f,image_url:v}))} placeholder="https://... ou /storage/logos/..."/>
+          {(cardForm.layout==='bg'||cardForm.layout==='right')&&<>
+            <Lbl>Opacidade da imagem: {Math.round((cardForm.img_opacity??1)*100)}%</Lbl>
+            <input type="range" min="10" max="100" value={Math.round((cardForm.img_opacity??1)*100)}
+              onChange={e=>setCardForm(f=>({...f,img_opacity:+e.target.value/100}))} className="w-full mb-3"/>
+          </>}
+        </>}
+
+        {/* Rotação do card */}
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <Lbl>Rotação na TV</Lbl>
+          <p className="text-xs text-gray-400 mb-2">Útil para TVs Samsung em modo retrato.</p>
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            {[{v:0,l:'0°'},{v:90,l:'90°'},{v:180,l:'180°'},{v:270,l:'270°'}].map(({v,l})=>(
+              <button key={v} type="button" onClick={()=>setCardForm(f=>({...f,_rotation:v}))}
+                className={`flex flex-col items-center gap-1 py-2 rounded-xl border-2 text-xs font-semibold transition ${(cardForm._rotation||0)===v?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 bg-white text-gray-500 hover:border-blue-300'}`}>
+                <span style={{display:'inline-block',transform:`rotate(${v}deg)`,fontSize:15,lineHeight:1}}>▶</span>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Mini preview */}
+        <div className="mt-2 rounded-xl overflow-hidden relative" style={{height:120,background:cardForm.bg_color||'#0f1e3a'}}>
+          <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',color:cardForm.text_color||'#fff',textAlign:'center',padding:12}}>
+            {cardModal.type==='weather_clock'&&<div style={{display:'grid',gridTemplateColumns:'1fr 1px 1fr',width:'100%',height:'100%',alignItems:'center'}}>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+                <div style={{fontSize:26}}>🌤</div>
+                <div style={{fontSize:28,fontWeight:900,lineHeight:1}}>{cardForm.city?'24°C':'--°C'}</div>
+                <div style={{fontSize:10,opacity:.55,marginTop:2}}>{cardForm.city||'Cidade'}</div>
+              </div>
+              <div style={{background:'rgba(255,255,255,.15)',height:'60%',alignSelf:'center'}}/>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center'}}>
+                <div style={{fontSize:30,fontWeight:900,lineHeight:1}}>{new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',hour12:cardForm.format==='12h'})}</div>
+                {cardForm.show_date!==false&&<div style={{fontSize:10,opacity:.55,marginTop:3}}>{new Date().toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'})}</div>}
+              </div>
+            </div>}
+            {cardModal.type==='clock_card'&&<div style={{flexDirection:'column',display:'flex',alignItems:'center'}}>
+              <div style={{fontSize:42,fontWeight:900,lineHeight:1}}>{new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',hour12:cardForm.format==='12h'})}</div>
+              {cardForm.show_date!==false&&<div style={{fontSize:13,opacity:.6,marginTop:4}}>{new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})}</div>}
+            </div>}
+            {cardModal.type==='weather_card'&&<div style={{flexDirection:'column',display:'flex',alignItems:'center'}}>
+              <div style={{fontSize:36}}>🌤</div>
+              <div style={{fontSize:38,fontWeight:900,lineHeight:1}}>{cardForm.city?'24°C':'--°C'}</div>
+              <div style={{fontSize:11,opacity:.6,marginTop:2}}>{cardForm.city||'Configure a cidade'}</div>
+            </div>}
+            {cardModal.type==='slide'&&<div style={{flexDirection:'column',display:'flex',alignItems:'center'}}>
+              {cardForm.icon&&<div style={{fontSize:28,marginBottom:4}}>{cardForm.icon}</div>}
+              <div style={{fontSize:cardForm.title?22:13,fontWeight:900,lineHeight:1.1}}>{cardForm.title||'Seu título aqui'}</div>
+              {cardForm.subtitle&&<div style={{fontSize:12,opacity:.7,marginTop:4}}>{cardForm.subtitle}</div>}
+            </div>}
+          </div>
+          <div style={{position:'absolute',bottom:6,right:8,fontSize:10,opacity:.4,color:cardForm.text_color||'#fff'}}>{cardForm._dur||15}s</div>
+        </div>
+      </Modal>}
+    </div>
+  );
+}
+
+// ── AGENDAMENTOS ─────────────────────────────────────────────────
+function SchedulesPage({tvs,playlists,schedules,onUpdate,showToast}){
+  const [modal,setModal]=useState(false);const [edit,setEdit]=useState(null);
+  const [form,setForm]=useState({tv_id:'',playlist_id:'',name:'',start_time:'08:00',end_time:'18:00',days:[1,2,3,4,5]});
+  const open=(s=null)=>{setEdit(s);setForm(s?{...s}:{tv_id:'',playlist_id:'',name:'',start_time:'08:00',end_time:'18:00',days:[1,2,3,4,5]});setModal(true);};
+  const save=async()=>{if(!form.tv_id||!form.playlist_id)return;edit?await api.updateSchedule(edit.id,form):await api.createSchedule(form);setModal(false);onUpdate();showToast('Agendamento salvo!');};
+  const del=async id=>{if(!confirm('Remover?'))return;await api.deleteSchedule(id);onUpdate();showToast('Removido');};
+  const toggleDay=d=>setForm(f=>({...f,days:f.days.includes(d)?f.days.filter(x=>x!==d):[...f.days,d].sort()}));
+  const toggleActive=async s=>{await api.updateSchedule(s.id,{active:s.active?0:1});onUpdate();};
+  const getTv=id=>tvs.find(t=>t.id===id);const getPl=id=>playlists.find(p=>p.id===id);
+  return (
+    <div className="p-4 md:p-6 fadein">
+      <div className="flex items-center justify-between mb-5">
+        <div><h2 className="text-xl md:text-2xl font-bold">Agendamentos</h2><p className="text-gray-500 text-sm">Playlists automáticas por horário e dia</p></div>
+        <button onClick={()=>open()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Novo</button>
+      </div>
+      {schedules.length===0&&<div className="text-center py-16 text-gray-400"><div className="text-4xl mb-3">🕐</div><p className="mb-2">Nenhum agendamento</p><button onClick={()=>open()} className="mt-3 text-blue-500 text-sm">Criar primeiro</button></div>}
+      <div className="space-y-3">
+        {schedules.map(s=>{const tv=getTv(s.tv_id);const pl=getPl(s.playlist_id);return(
+          <div key={s.id} className={`bg-white rounded-xl shadow-sm border p-4 fadein transition ${s.active?'border-blue-100':'border-gray-100 opacity-60'}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-semibold truncate">{s.name}</h3>
+                  {s.active&&<span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">ativo</span>}
+                </div>
+                <p className="text-sm text-gray-600">{tv?.name||s.tv_id} → <span className="font-medium">{pl?.name||s.playlist_id}</span></p>
+                <p className="text-xs text-gray-400 mt-0.5">🕐 {s.start_time} – {s.end_time}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-wrap gap-0.5 justify-end max-w-32">
+                  {DAYS.map((d,i)=><span key={i} className={`text-xs px-1.5 py-0.5 rounded ${(s.days||[]).includes(i)?'bg-blue-100 text-blue-700':'bg-gray-100 text-gray-400'}`}>{d}</span>)}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-1.5 mt-3">
+              <button onClick={()=>toggleActive(s)} className={`flex-1 text-xs py-1.5 rounded-lg border transition ${s.active?'border-yellow-200 text-yellow-600 hover:bg-yellow-50':'border-green-200 text-green-600 hover:bg-green-50'}`}>{s.active?'⏸ Pausar':'▶ Ativar'}</button>
+              <button onClick={()=>open(s)} className="flex-1 text-xs border border-gray-200 hover:border-blue-300 hover:text-blue-600 py-1.5 rounded-lg transition">✏️ Editar</button>
+              <button onClick={()=>del(s.id)} className="text-xs text-red-400 border border-gray-200 px-3 py-1.5 rounded-lg transition">🗑</button>
+            </div>
+          </div>
+        );})}
+      </div>
+      {modal&&<Modal title={edit?'Editar Agendamento':'Novo Agendamento'} onClose={()=>setModal(false)} onSave={save}>
+        <Lbl>Nome do agendamento</Lbl><Inp value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} placeholder="Ex: Cardápio Almoço"/>
+        <Lbl>TV</Lbl>
+        <Sel value={form.tv_id} onChange={v=>setForm(f=>({...f,tv_id:v}))}>
+          <option value="">— Selecione —</option>{tvs.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+        </Sel>
+        <Lbl>Playlist</Lbl>
+        <Sel value={form.playlist_id} onChange={v=>setForm(f=>({...f,playlist_id:v}))}>
+          <option value="">— Selecione —</option>{playlists.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+        </Sel>
+        <div className="grid grid-cols-2 gap-2">
+          <div><Lbl>Início</Lbl><input type="time" value={form.start_time} onChange={e=>setForm(f=>({...f,start_time:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/></div>
+          <div><Lbl>Fim</Lbl><input type="time" value={form.end_time} onChange={e=>setForm(f=>({...f,end_time:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/></div>
+        </div>
+        <Lbl>Dias da semana</Lbl>
+        <div className="flex gap-1.5 flex-wrap mb-3">
+          {DAYS.map((d,i)=><button key={i} type="button" onClick={()=>toggleDay(i)} className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${form.days.includes(i)?'bg-blue-600 text-white':'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{d}</button>)}
+        </div>
+      </Modal>}
+    </div>
+  );
+}
+
+// ── WIDGETS ──────────────────────────────────────────────────────
+const WIDGET_TYPES=[
+  {value:'clock',    label:'⏰ Relógio',        desc:'Hora e data'},
+  {value:'weather',  label:'🌤 Clima',           desc:'Temperatura e condição'},
+  {value:'news',     label:'📰 Notícias',        desc:'Ticker de manchetes'},
+  {value:'text',     label:'💬 Texto',           desc:'Mensagem fixa'},
+  {value:'countdown',label:'⏳ Contagem Regressiva', desc:'Contador para evento'},
+  {value:'menu',     label:'🍽 Cardápio',        desc:'Lista de pratos e preços'},
+  {value:'qrcode',   label:'📱 QR Code',         desc:'Link em QR Code'},
+  {value:'iframe',   label:'🖥 iFrame',          desc:'Qualquer site ou URL'},
+];
+const WIDGET_POSITIONS=[
+  {value:'bottom',    label:'▬ Barra inferior'},
+  {value:'top',       label:'▬ Barra superior'},
+  {value:'side-left', label:'▮ Barra lateral esq.'},
+  {value:'side-right',label:'▮ Barra lateral dir.'},
+  {value:'corner-tr', label:'◱ Canto sup. direito'},
+  {value:'corner-br', label:'◲ Canto inf. direito'},
+  {value:'free',      label:'📍 Posição personalizada'},
+  {value:'fullscreen',label:'⬜ Tela cheia (iframe)'},
+];
+const WIDGET_SIZES=[{value:'sm',label:'Pequeno'},{value:'md',label:'Médio'},{value:'lg',label:'Grande'},{value:'xl',label:'Extra grande'}];
+const ESTADO_SIGLAS={'AC':'ACRE','AL':'ALAGOAS','AP':'AMAPÁ','AM':'AMAZONAS','BA':'BAHIA','CE':'CEARÁ','DF':'DISTRITO FEDERAL','ES':'ESPÍRITO SANTO','GO':'GOIÁS','MA':'MARANHÃO','MT':'MATO GROSSO','MS':'MATO GROSSO DO SUL','MG':'MINAS GERAIS','PA':'PARÁ','PB':'PARAÍBA','PR':'PARANÁ','PE':'PERNAMBUCO','PI':'PIAUÍ','RJ':'RIO DE JANEIRO','RN':'RIO GRANDE DO NORTE','RS':'RIO GRANDE DO SUL','RO':'RONDÔNIA','RR':'RORAIMA','SC':'SANTA CATARINA','SP':'SÃO PAULO','SE':'SERGIPE','TO':'TOCANTINS'};
+const SNAP_POINTS=[
+  {id:'top',      pos:'top',       label:'Barra topo',       icon:'▬', x:50,y:3},
+  {id:'bottom',   pos:'bottom',    label:'Barra base',       icon:'▬', x:50,y:97},
+  {id:'side-left',pos:'side-left', label:'Lateral esq.',     icon:'▮', x:3, y:50},
+  {id:'side-right',pos:'side-right',label:'Lateral dir.',    icon:'▮', x:97,y:50},
+  {id:'corner-tr',pos:'corner-tr', label:'Canto sup. dir.',  icon:'◱', x:97,y:3},
+  {id:'corner-br',pos:'corner-br', label:'Canto inf. dir.',  icon:'◲', x:97,y:97},
+];
+
+function WidgetPositionPicker({position,freeX=85,freeY=10,onChange}){
+  const ref=useRef();const[dragging,setDragging]=useState(false);
+  const[dp,setDp]=useState({x:freeX,y:freeY});
+  useEffect(()=>{if(position==='free')setDp({x:freeX,y:freeY});},[position,freeX,freeY]);
+  function pct(e){const r=ref.current.getBoundingClientRect();const cx=e.touches?e.touches[0].clientX:e.clientX,cy=e.touches?e.touches[0].clientY:e.clientY;return{x:Math.round(Math.max(2,Math.min(98,(cx-r.left)/r.width*100))),y:Math.round(Math.max(2,Math.min(98,(cy-r.top)/r.height*100)))}}
+  function onStart(e){if(position!=='free')return;e.preventDefault();setDragging(true);const p=pct(e);setDp(p);onChange('free',p.x,p.y);}
+  function onMove(e){if(!dragging)return;const p=pct(e);setDp(p);onChange('free',p.x,p.y);}
+  function onEnd(){setDragging(false);}
+  const marker=position==='free'?dp:(SNAP_POINTS.find(s=>s.pos===position)||{x:50,y:50});
+  return (
+    <div className="mb-3">
+      <Lbl>Posição na tela</Lbl>
+      <div ref={ref} onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
+        onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
+        className="relative rounded-lg overflow-hidden mb-3 select-none"
+        style={{background:'#111',aspectRatio:'16/9',width:'100%',cursor:position==='free'?(dragging?'grabbing':'crosshair'):'default',border:'2px solid #e5e7eb'}}>
+        <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px)',backgroundSize:'25% 25%'}}/>
+        <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',color:'rgba(255,255,255,.1)',fontSize:'10px',fontWeight:600,letterSpacing:2,pointerEvents:'none'}}>TELA 16:9</div>
+        <div style={{position:'absolute',top:0,left:0,right:0,height:'6%',background:position==='top'?'rgba(59,130,246,.6)':'rgba(255,255,255,.07)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',bottom:0,left:0,right:0,height:'6%',background:position==='bottom'?'rgba(59,130,246,.6)':'rgba(255,255,255,.07)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',top:0,bottom:0,left:0,width:'5%',background:position==='side-left'?'rgba(59,130,246,.6)':'rgba(255,255,255,.07)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',top:0,bottom:0,right:0,width:'5%',background:position==='side-right'?'rgba(59,130,246,.6)':'rgba(255,255,255,.07)',pointerEvents:'none'}}/>
+        <div style={{position:'absolute',left:marker.x+'%',top:marker.y+'%',transform:'translate(-50%,-50%)',width:26,height:26,background:'#3b82f6',borderRadius:7,border:'2px solid #fff',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:11,fontWeight:700,boxShadow:'0 2px 8px rgba(0,0,0,.5)',pointerEvents:'none',zIndex:10,transition:dragging?'none':'left .12s,top .12s'}}>W</div>
+        {position==='free'&&<div style={{position:'absolute',bottom:'8%',left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,.6)',color:'rgba(255,255,255,.7)',fontSize:10,padding:'2px 8px',borderRadius:20,pointerEvents:'none',whiteSpace:'nowrap'}}>{dragging?'📍 Posicionando...':'Clique ou arraste'}</div>}
+      </div>
+      <div className="grid grid-cols-3 gap-1.5 mb-1">
+        {SNAP_POINTS.map(s=>(
+          <button key={s.id} type="button" onClick={()=>onChange(s.pos,s.x,s.y)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition ${position===s.pos?'bg-blue-500 text-white border-blue-500':'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
+            <span>{s.icon}</span>{s.label}
+          </button>
+        ))}
+        <button type="button" onClick={()=>onChange('free',dp.x,dp.y)}
+          className={`col-span-2 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition ${position==='free'?'bg-blue-500 text-white border-blue-500':'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
+          📍 Posição livre{position==='free'&&<span className="opacity-70 font-normal">({dp.x}%, {dp.y}%)</span>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Componente separado para evitar hooks condicionais em WidgetConfigFields
+function LogoWidgetConfig({config, onChange}) {
+  const set=(k,v)=>onChange({...config,[k]:v});
+  const fileRef = useRef();
+  const [uploading, setUploading] = useState(false);
+
+  const uploadFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const r = await api.uploadLogo(file, 'sponsor');
+      if (r.url) {
+        // Um único onChange para evitar sobrescrita (set sequencial usa config stale)
+        onChange({ ...config, url: r.url, _filename: r.filename });
+      } else if (r.error) alert(r.error);
+    } catch(e) { alert('Erro no upload: ' + e.message); }
+    setUploading(false);
+  };
+
+  return (<>
+    <Lbl>Logo (PNG, JPG, GIF, WebP)</Lbl>
+    <div
+      onClick={()=>fileRef.current?.click()}
+      className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition mb-3 ${config.url?'border-green-300 bg-green-50':'border-gray-200 hover:border-blue-300'}`}>
+      {uploading
+        ? <p className="text-sm text-blue-600">⏳ Enviando...</p>
+        : config.url
+          ? <div>
+              <img src={config.url} alt="Logo" className="mx-auto mb-2" style={{maxHeight:64,maxWidth:'100%',objectFit:'contain'}} onError={e=>e.target.style.display='none'}/>
+              <p className="text-xs text-green-600 font-medium">✅ Logo carregada — clique para trocar</p>
+            </div>
+          : <div><div className="text-2xl mb-1">🖼</div><p className="text-sm text-gray-500">Clique para enviar PNG, JPG ou GIF</p><p className="text-xs text-gray-400 mt-0.5">Máx. 10 MB</p></div>
+      }
+    </div>
+    <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" className="hidden"
+      onChange={e=>uploadFile(e.target.files?.[0])}/>
+    <Lbl>Ou cole uma URL diretamente</Lbl>
+    <Inp value={config.url||''} onChange={v=>set('url',v)} placeholder="https://... ou /storage/logos/..."/>
+    <div className="grid grid-cols-2 gap-2">
+      <div>
+        <Lbl>Largura (px)</Lbl>
+        <input type="number" value={config.width||120} onChange={e=>set('width',+e.target.value)} min="40" max="600"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/>
+      </div>
+      <div>
+        <Lbl>Opacidade: {Math.round((config.opacity??1)*100)}%</Lbl>
+        <input type="range" min="10" max="100" value={Math.round((config.opacity??1)*100)}
+          onChange={e=>set('opacity',+e.target.value/100)} className="w-full mt-3"/>
+      </div>
+    </div>
+    <div className="flex items-center gap-3 mb-3">
+      <input type="checkbox" id="transp" checked={!!config.transparent} onChange={e=>set('transparent',e.target.checked)}/>
+      <label htmlFor="transp" className="text-sm text-gray-700">Fundo transparente</label>
+      {!config.transparent && <input type="color" value={config.bg_color||'#000000'} onChange={e=>set('bg_color',e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer"/>}
+    </div>
+    <Lbl>Tamanho do widget</Lbl>
+    <Sel value={config.widget_size||'md'} onChange={v=>set('widget_size',v)}>{WIDGET_SIZES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</Sel>
+  </>);
+}
+
+function WidgetConfigFields({type,config,onChange}){
+  const set=(k,v)=>onChange({...config,[k]:v});
+  const [geoPreview,setGeoPreview]=useState(null);const [geoLoading,setGeoLoading]=useState(false);
+  const [testResult,setTestResult]=useState(null);const [testing,setTesting]=useState(false);
+  const searchCity=async()=>{
+    if(!(config.city||'').trim())return;setGeoLoading(true);
+    try{const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(config.city)}&count=10&language=pt&format=json`);const j=await r.json();let rs=j.results||[];const br=rs.filter(r=>r.country_code==='BR');let fl=br.length>0?br:rs;if(config.state&&br.length>1){const st=config.state.toUpperCase().trim();const bs=br.filter(r=>(r.admin1||'').toUpperCase().includes(ESTADO_SIGLAS[st]||st));if(bs.length)fl=bs;}setGeoPreview(fl.slice(0,5));}catch{setGeoPreview([]);}
+    setGeoLoading(false);
+  };
+  const testUrl=async()=>{if(!config.rss_url)return;setTesting(true);setTestResult(null);try{const r=await fetch(`/api/proxy/news?url=${encodeURIComponent(config.rss_url)}`);const j=await r.json();setTestResult(j);}catch(e){setTestResult({error:e.message,items:[]});}setTesting(false);};
+
+  if(type==='weather') return (<>
+    <div className="grid grid-cols-2 gap-2 mb-1">
+      <div><Lbl>Cidade</Lbl><Inp value={config.city||''} onChange={v=>set('city',v)} placeholder="Ex: Bragança"/></div>
+      <div><Lbl>Estado</Lbl><Inp value={config.state||''} onChange={v=>set('state',v)} placeholder="Ex: PA"/></div>
+    </div>
+    <button type="button" onClick={searchCity} disabled={geoLoading} className="w-full text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 rounded-lg mb-3 transition disabled:opacity-50">{geoLoading?'Buscando...':'🔍 Verificar cidade'}</button>
+    {geoPreview!==null&&(geoPreview.length===0?<p className="text-xs text-red-500 mb-3">Cidade não encontrada.</p>:
+      <div className="mb-3 space-y-1">{geoPreview.map((r,i)=>(
+        <div key={i} onClick={()=>{set('city',r.name);set('state',r.admin1||'');set('_lat',r.latitude);set('_lon',r.longitude);setGeoPreview(null);}} className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2 cursor-pointer hover:bg-green-100">
+          <div><p className="text-xs font-medium text-green-800">{r.name}{r.admin1?`, ${r.admin1}`:''}</p><p className="text-xs text-green-600">{r.latitude.toFixed(4)}, {r.longitude.toFixed(4)}</p></div>
+          <span className="text-green-500">✓</span>
+        </div>
+      ))}</div>
+    )}
+    <div className="grid grid-cols-2 gap-2">
+      <div><Lbl>Temperatura</Lbl><Sel value={config.unit||'C'} onChange={v=>set('unit',v)}><option value="C">°C</option><option value="F">°F</option></Sel></div>
+      <div><Lbl>Tamanho</Lbl><Sel value={config.widget_size||'md'} onChange={v=>set('widget_size',v)}>{WIDGET_SIZES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</Sel></div>
+    </div>
+  </>);
+
+  if(type==='news') return (<>
+    <Lbl>URL do site ou feed RSS</Lbl>
+    <div className="flex gap-2 mb-2">
+      <input value={config.rss_url||''} onChange={e=>set('rss_url',e.target.value)} placeholder="https://g1.globo.com/rss/g1/saude/" className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400"/>
+      <button type="button" onClick={testUrl} disabled={testing||!config.rss_url} className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition disabled:opacity-40 whitespace-nowrap">{testing?'⏳':'🔍 Testar'}</button>
+    </div>
+    {testResult&&(testResult.items?.length>0
+      ?<div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3"><p className="text-xs font-semibold text-green-700 mb-1">✅ {testResult.items.length} notícias via {testResult.source}</p>{testResult.items.slice(0,4).map((n,i)=><p key={i} className="text-xs text-green-800 truncate">• {n}</p>)}</div>
+      :<div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3"><p className="text-xs font-semibold text-red-700">❌ Nenhuma notícia</p>{(testResult.hint||testResult.error)&&<p className="text-xs text-red-600 mt-1">{testResult.hint||testResult.error}</p>}</div>
+    )}
+    <div className="grid grid-cols-3 gap-2 mb-2">
+      <div><Lbl>Qtde</Lbl><input type="number" value={config.count||10} onChange={e=>set('count',Math.min(20,Math.max(1,+e.target.value)))} min="1" max="20" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-center"/></div>
+      <div><Lbl>Velocidade</Lbl><input type="number" value={config.speed||60} onChange={e=>set('speed',+e.target.value)} min="20" max="200" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"/></div>
+      <div><Lbl>Tamanho</Lbl><Sel value={config.widget_size||'md'} onChange={v=>set('widget_size',v)}>{WIDGET_SIZES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</Sel></div>
+    </div>
+    <div className="bg-blue-50 rounded-lg p-2.5 text-xs text-blue-700">
+      <p className="font-semibold mb-1">📡 Feeds RSS sugeridos:</p>
+      {[['G1 Saúde','https://g1.globo.com/rss/g1/saude/'],['G1 Brasil','https://g1.globo.com/rss/g1/brasil/'],['BBC Brasil','https://www.bbc.com/portuguese/index.xml'],['UOL Notícias','https://rss.uol.com.br/feed/noticias.xml']].map(([l,u])=>(<p key={u} className="cursor-pointer hover:text-blue-900 truncate" onClick={()=>set('rss_url',u)}>➤ {l}</p>))}
+    </div>
+  </>);
+
+  if(type==='clock') return (<>
+    <div className="grid grid-cols-2 gap-2">
+      <div><Lbl>Formato</Lbl><Sel value={config.format||'24h'} onChange={v=>set('format',v)}><option value="24h">24h</option><option value="12h">12h AM/PM</option></Sel></div>
+      <div><Lbl>Tamanho</Lbl><Sel value={config.widget_size||'md'} onChange={v=>set('widget_size',v)}>{WIDGET_SIZES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</Sel></div>
+    </div>
+    <div className="flex items-center gap-2 mb-3"><input type="checkbox" checked={config.showDate!==false} onChange={e=>set('showDate',e.target.checked)} id="showDate"/><label htmlFor="showDate" className="text-sm text-gray-700">Mostrar data</label></div>
+  </>);
+
+  if(type==='text') return (<>
+    <Lbl>Mensagem</Lbl>
+    <textarea value={config.text||''} onChange={e=>set('text',e.target.value)} placeholder="Ex: Bem-vindo!" rows={3} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm focus:outline-none focus:border-blue-400 resize-none"/>
+    <div className="grid grid-cols-2 gap-2">
+      <div><Lbl>Cor do texto</Lbl><input type="color" value={config.color||'#ffffff'} onChange={e=>set('color',e.target.value)} className="w-full h-10 rounded-lg border border-gray-200 cursor-pointer mb-3"/></div>
+      <div><Lbl>Tamanho</Lbl><Sel value={config.widget_size||'md'} onChange={v=>set('widget_size',v)}>{WIDGET_SIZES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</Sel></div>
+    </div>
+  </>);
+
+  if(type==='countdown') return (<>
+    <Lbl>Rótulo do evento</Lbl><Inp value={config.label||''} onChange={v=>set('label',v)} placeholder="Ex: Formatura 2025"/>
+    <Lbl>Data/hora do evento</Lbl><input type="datetime-local" value={config.target_date||''} onChange={e=>set('target_date',e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/>
+    <div className="grid grid-cols-2 gap-2">
+      <div><Lbl>Cor</Lbl><input type="color" value={config.color||'#ffffff'} onChange={e=>set('color',e.target.value)} className="w-full h-10 rounded-lg border border-gray-200 cursor-pointer mb-3"/></div>
+      <div><Lbl>Tamanho</Lbl><Sel value={config.widget_size||'md'} onChange={v=>set('widget_size',v)}>{WIDGET_SIZES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</Sel></div>
+    </div>
+  </>);
+
+  if(type==='menu') {
+    const items=config.items||[{name:'',price:''}];
+    const setItems=its=>set('items',its);
+    const addItem=()=>setItems([...items,{name:'',price:''}]);
+    const rmItem=i=>setItems(items.filter((_,j)=>j!==i));
+    const setItem=(i,k,v)=>setItems(items.map((it,j)=>j===i?{...it,[k]:v}:it));
+    return (<>
+      <Lbl>Título do cardápio</Lbl><Inp value={config.title||''} onChange={v=>set('title',v)} placeholder="Ex: Cardápio do Dia"/>
+      <Lbl>Itens</Lbl>
+      <div className="space-y-2 mb-3 max-h-52 overflow-y-auto">
+        {items.map((it,i)=>(
+          <div key={i} className="flex gap-2 items-center">
+            <input value={it.name} onChange={e=>setItem(i,'name',e.target.value)} placeholder="Nome do prato" className="flex-1 border border-gray-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-blue-400"/>
+            <input value={it.price} onChange={e=>setItem(i,'price',e.target.value)} placeholder="R$ 0,00" className="w-24 border border-gray-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-blue-400"/>
+            <button type="button" onClick={()=>rmItem(i)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
+          </div>
+        ))}
+      </div>
+      <button type="button" onClick={addItem} className="w-full text-xs bg-gray-100 hover:bg-gray-200 py-2 rounded-lg mb-3 transition">+ Adicionar item</button>
+      <div className="grid grid-cols-2 gap-2">
+        <div><Lbl>Cor de fundo</Lbl><input type="color" value={config.bg_color||'#000000'} onChange={e=>set('bg_color',e.target.value)} className="w-full h-10 rounded-lg border border-gray-200 cursor-pointer mb-3"/></div>
+        <div><Lbl>Tamanho</Lbl><Sel value={config.widget_size||'md'} onChange={v=>set('widget_size',v)}>{WIDGET_SIZES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</Sel></div>
+      </div>
+    </>);
+  }
+
+  if(type==='qrcode') return (<>
+    <Lbl>URL do QR Code</Lbl><Inp value={config.url||''} onChange={v=>set('url',v)} placeholder="https://exemplo.com"/>
+    <Lbl>Legenda (opcional)</Lbl><Inp value={config.qr_label||''} onChange={v=>set('qr_label',v)} placeholder="Ex: Acesse nosso site"/>
+  </>);
+
+  if(type==='iframe') return (<>
+    <Lbl>URL</Lbl><Inp value={config.url||''} onChange={v=>set('url',v)} placeholder="https://..."/>
+    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2.5 text-xs text-yellow-800">⚠️ Nem todos os sites permitem incorporação. Se aparecer em branco, o site bloqueou o iframe.</div>
+  </>);
+
+
+
+  return null;
+}
+
+function WidgetsPage({widgets,tvs,onUpdate,showToast}){
+  const [modal,setModal]=useState(false);const [edit,setEdit]=useState(null);
+  const [form,setForm]=useState({name:'',type:'clock',config:{},position:'corner-tr',active:1,tv_ids:[],rotation:0});
+  const open=(w=null)=>{
+    setEdit(w);
+    setForm(w
+      ? {name:w.name,type:w.type,config:{...w.config},position:w.position,active:w.active,
+         tv_ids:w.tv_ids?w.tv_ids.split(',').filter(Boolean):[],
+         rotation:w.rotation||0}
+      : {name:'',type:'clock',config:{},position:'corner-tr',active:1,tv_ids:[],rotation:0});
+    setModal(true);
+  };
+  const save=async()=>{
+    if(!form.name.trim())return;
+    const d={...form,tv_ids:form.tv_ids.join(',')};
+    edit?await api.updateWidget(edit.id,d):await api.createWidget(d);
+    setModal(false);onUpdate();showToast(edit?'Widget atualizado!':'Widget criado!');
+  };
+  const del=async id=>{if(!confirm('Remover widget?'))return;await api.deleteWidget(id);onUpdate();showToast('Removido');};
+  const toggleActive=async w=>{await api.updateWidget(w.id,{active:w.active?0:1});onUpdate();};
+  const posLabel=p=>WIDGET_POSITIONS.find(x=>x.value===p)?.label||p;
+  const typeLabel=t=>WIDGET_TYPES.find(x=>x.value===t)?.label||t;
+  const toggleTv=id=>setForm(f=>({...f,tv_ids:f.tv_ids.includes(id)?f.tv_ids.filter(x=>x!==id):[...f.tv_ids,id]}));
+
+  return (
+    <div className="p-4 md:p-6 fadein">
+      <div className="flex items-center justify-between mb-5">
+        <div><h2 className="text-xl md:text-2xl font-bold">Widgets</h2><p className="text-gray-500 text-sm">Sobreposições sobre o conteúdo</p></div>
+        <button onClick={()=>open()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Novo</button>
+      </div>
+      <div className="space-y-2">
+        {widgets.map(w=>{
+          const tvNames=(w.tv_ids||'').split(',').filter(Boolean).map(id=>(tvs||[]).find(t=>t.id===id)?.name||id);
+          return(
+          <div key={w.id} className={`bg-white rounded-xl border p-3 fadein flex items-center gap-3 ${w.active?'border-gray-100 shadow-sm':'border-gray-100 opacity-50'}`}>
+            <span className="text-xl">{WIDGET_TYPES.find(t=>t.value===w.type)?.label.split(' ')[0]||'🧩'}</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{w.name}</p>
+              <div className="flex flex-wrap gap-1 mt-0.5">
+                <span className="text-xs text-gray-400">{typeLabel(w.type)} · {posLabel(w.position)}</span>
+                {(w.rotation||0)!==0&&<span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold">↻{w.rotation}°</span>}
+                {tvNames.length>0
+                  ? tvNames.map(n=><span key={n} className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full">{n}</span>)
+                  : <span className="text-xs text-gray-300">Todas as TVs</span>}
+              </div>
+            </div>
+            <div className="flex gap-1.5 flex-shrink-0">
+              <button onClick={()=>toggleActive(w)} className={`text-xs px-2 py-1 rounded-lg border transition ${w.active?'border-yellow-200 text-yellow-600':'border-green-200 text-green-600'}`}>{w.active?'⏸':'▶'}</button>
+              <button onClick={()=>open(w)} className="text-xs border border-gray-200 px-2 py-1 rounded-lg hover:border-blue-300 hover:text-blue-600 transition">✏️</button>
+              <button onClick={()=>del(w.id)} className="text-xs text-red-400 border border-gray-200 px-2 py-1 rounded-lg transition">🗑</button>
+            </div>
+          </div>
+        );})}
+        {widgets.length===0&&<div className="text-center py-16 text-gray-400"><div className="text-4xl mb-3">🧩</div><p>Nenhum widget criado</p><button onClick={()=>open()} className="mt-2 text-blue-500 text-sm">Criar primeiro</button></div>}
+      </div>
+      {modal&&<Modal title={edit?'Editar Widget':'Novo Widget'} onClose={()=>setModal(false)} onSave={save} wide>
+        <Lbl>Nome</Lbl><Inp value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} placeholder="Ex: Clima Bragança"/>
+        <Lbl>Tipo</Lbl>
+        <Sel value={form.type} onChange={v=>setForm(f=>({...f,type:v,config:{}}))}>
+          {WIDGET_TYPES.map(t=><option key={t.value} value={t.value}>{t.label} — {t.desc}</option>)}
+        </Sel>
+        <WidgetConfigFields type={form.type} config={form.config} onChange={c=>setForm(f=>({...f,config:c}))}/>
+        <WidgetPositionPicker
+          position={form.position}
+          freeX={form.config._x||85}
+          freeY={form.config._y||10}
+          onChange={(pos,x,y)=>setForm(f=>({...f,position:pos,config:pos==='free'?{...f.config,_x:x,_y:y}:f.config}))}
+        />
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <Lbl>TVs que exibem este widget</Lbl>
+          <p className="text-xs text-gray-400 mb-2">Sem seleção = aparece em <strong>todas</strong> as TVs.</p>
+          {(tvs||[]).length===0
+            ? <p className="text-xs text-gray-400">Nenhuma TV cadastrada.</p>
+            : <div className="flex flex-wrap gap-2">
+                {(tvs||[]).map(tv=>(
+                  <button key={tv.id} type="button" onClick={()=>toggleTv(tv.id)}
+                    className={`px-3 py-1.5 rounded-xl border-2 text-xs font-medium transition ${form.tv_ids.includes(tv.id)?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 bg-white text-gray-500 hover:border-blue-300'}`}>
+                    📺 {tv.name}
+                  </button>
+                ))}
+              </div>
+          }
+        </div>
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <Lbl>Rotação do widget</Lbl>
+          <p className="text-xs text-gray-400 mb-2">Gira o widget na tela — útil para TVs em retrato.</p>
+          <div className="grid grid-cols-4 gap-2">
+            {[{v:0,l:'0°'},{v:90,l:'90°'},{v:180,l:'180°'},{v:270,l:'270°'}].map(({v,l})=>(
+              <button key={v} type="button" onClick={()=>setForm(f=>({...f,rotation:v}))}
+                className={`flex flex-col items-center gap-1 py-2.5 rounded-xl border-2 text-xs font-semibold transition ${form.rotation===v?'border-blue-500 bg-blue-50 text-blue-700':'border-gray-200 bg-white text-gray-500 hover:border-blue-300'}`}>
+                <span style={{display:'inline-block',transform:`rotate(${v}deg)`,fontSize:16,lineHeight:1,marginBottom:2}}>🧩</span>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Modal>}
+    </div>
+  );
+}
+
+// ── EMERGÊNCIA ───────────────────────────────────────────────────
+
+const SP_POSITIONS=[
+  {v:'tl',l:'↖ Superior Esq.'},{v:'tc',l:'⬆ Superior Centro'},{v:'tr',l:'↗ Superior Dir.'},
+  {v:'bl',l:'↙ Inferior Esq.'},{v:'bc',l:'⬇ Inferior Centro'},{v:'br',l:'↘ Inferior Dir.'},
+  {v:'center',l:'⊙ Centro'},
+];
+const SP_ROTATIONS=[{v:0,l:'0°'},{v:90,l:'90°'},{v:180,l:'180°'},{v:270,l:'270°'}];
+
+function SponsorGroup({group, onUpdate, showToast}){
+  const [open,setOpen]=useState(false);
+  const [uploading,setUploading]=useState(false);
+  const [saving,setSaving]=useState(false);
+  const [dragIdx,setDragIdx]=useState(null);
+  const fileRef=useRef();
+  const [cfg,setCfg]=useState({...group.config});
+  const [meta,setMeta]=useState({name:group.name,position:group.position,active:group.active,rotation:group.rotation||0});
+  const set=(k,v)=>setCfg(f=>({...f,[k]:v}));
+  const setM=(k,v)=>setMeta(f=>({...f,[k]:v}));
+
+  const save=async()=>{
+    setSaving(true);
+    await api.updateSponsorGroup(group.id,{...meta,config:cfg});
+    setSaving(false);onUpdate();showToast('✅ Grupo salvo!');
+  };
+  const toggle=async()=>{
+    await api.updateSponsorGroup(group.id,{active:!group.active});
+    onUpdate();
+  };
+  const del=async()=>{
+    if(!confirm(`Remover grupo "${group.name}" e todos os seus logos?`))return;
+    await api.deleteSponsorGroup(group.id);onUpdate();showToast('Removido');
+  };
+  const uploadLogos=async files=>{
+    if(!files?.length)return;setUploading(true);
+    for(const f of Array.from(files)){
+      const r=await api.uploadSponsorLogo(group.id,f);
+      if(r.error)showToast(r.error,'error');
+    }
+    setUploading(false);onUpdate();showToast(files.length+' logo(s) adicionado(s)!');
+  };
+  const delLogo=async lid=>{
+    await api.deleteSponsorLogo(group.id,lid);onUpdate();
+  };
+  const dropLogo=async toIdx=>{
+    if(dragIdx===null||dragIdx===toIdx)return;
+    const ids=[...group.logos.map(l=>l.id)];
+    const[item]=ids.splice(dragIdx,1);ids.splice(toIdx,0,item);
+    await api.reorderSponsorLogos(group.id,ids);onUpdate();setDragIdx(null);
+  };
+
+  const posLabel=SP_POSITIONS.find(p=>p.v===group.position)?.l||group.position;
+
+  return(
+    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden fadein ${!group.active?'opacity-60':''}`}>
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button onClick={toggle} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 ${group.active?'bg-green-500':'bg-gray-300'}`}>
+          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${group.active?'translate-x-4':'translate-x-0.5'}`}/>
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm truncate">{group.name}</p>
+          <p className="text-xs text-gray-400">{posLabel} · {group.logos?.length||0} logos · {group.config?.interval||5}s{group.rotation?` · ↻${group.rotation}°`:''}</p>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button onClick={()=>setOpen(o=>!o)} className="text-xs border border-gray-200 hover:border-blue-300 hover:text-blue-600 px-2.5 py-1.5 rounded-lg transition">
+            {open?'▲ Fechar':'✏️ Editar'}
+          </button>
+          <button onClick={del} className="text-xs text-red-400 border border-gray-200 hover:border-red-300 px-2.5 py-1.5 rounded-lg transition">🗑</button>
+        </div>
+      </div>
+
+      {/* Preview mini dos logos */}
+      {(group.logos||[]).length>0&&!open&&(
+        <div className="px-4 pb-3 flex gap-2 overflow-x-auto">
+          {group.logos.map(l=>(
+            <div key={l.id} className="w-14 h-10 bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <img src={l.url} alt={l.name} className="max-w-full max-h-full object-contain" style={{transform:group.rotation?`rotate(${group.rotation}deg)`:''}}/>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Painel de edição */}
+      {open&&<div className="border-t border-gray-100 p-4 space-y-4 bg-gray-50">
+        {/* Nome e posição */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Nome</label>
+            <input value={meta.name} onChange={e=>setM('name',e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400 bg-white"/>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Rotação das imagens</label>
+            <div className="flex gap-1">
+              {SP_ROTATIONS.map(r=>(
+                <button key={r.v} onClick={()=>setM('rotation',r.v)} className={`flex-1 py-1.5 rounded-lg text-xs border transition ${meta.rotation===r.v?'bg-blue-600 text-white border-blue-600':'bg-white border-gray-200 hover:border-blue-300'}`}>{r.l}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Posição na tela */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">Posição na tela</label>
+          <div className="grid grid-cols-3 gap-1.5">
+            {SP_POSITIONS.map(p=>(
+              <button key={p.v} onClick={()=>setM('position',p.v)} className={`py-1.5 px-1 rounded-lg text-xs border transition ${meta.position===p.v?'bg-blue-600 text-white border-blue-600':'bg-white border-gray-200 hover:border-blue-300'}`}>{p.l}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Dimensões e intervalo */}
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Largura (px)</label>
+            <input type="number" value={cfg.width||160} min="40" max="800" onChange={e=>set('width',+e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-blue-400"/>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Altura (px)</label>
+            <input type="number" value={cfg.height||80} min="20" max="400" onChange={e=>set('height',+e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-blue-400"/>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Intervalo (s)</label>
+            <input type="number" value={cfg.interval||5} min="1" max="60" onChange={e=>set('interval',+e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-blue-400"/>
+          </div>
+        </div>
+
+        {/* Opacidade e visual */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Opacidade: {Math.round((cfg.opacity??0.9)*100)}%</label>
+            <input type="range" min="10" max="100" value={Math.round((cfg.opacity??0.9)*100)} onChange={e=>set('opacity',+e.target.value/100)} className="w-full mt-1"/>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Arredondamento</label>
+            <input type="number" value={cfg.radius??8} min="0" max="40" onChange={e=>set('radius',+e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:border-blue-400"/>
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Fundo</label>
+          <div className="flex gap-2 items-center">
+            <button onClick={()=>set('bg','transparent')} className={"px-2.5 py-1.5 rounded-lg text-xs border transition flex-shrink-0 "+(cfg.bg==='transparent'?'bg-gray-800 text-white border-gray-800':'bg-white border-gray-200 hover:border-gray-400 text-gray-600')}>
+              Transparente
+            </button>
+            <input type="color" value={'#000000'} onChange={e=>set('bg',e.target.value+'cc')} className="w-9 h-9 rounded border border-gray-200 cursor-pointer flex-shrink-0" title="Escolher cor"/>
+            <input type="text" value={cfg.bg||'rgba(0,0,0,0.45)'} onChange={e=>set('bg',e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-mono bg-white focus:outline-none focus:border-blue-400"/>
+          </div>
+        </div>
+
+        <button onClick={save} disabled={saving} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50">
+          {saving?'Salvando...':'💾 Salvar configurações'}
+        </button>
+
+        {/* Logos do grupo */}
+        <div className="border-t border-gray-200 pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-gray-700">Logos ({(group.logos||[]).length})</p>
+            <button onClick={()=>fileRef.current?.click()} disabled={uploading} className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg transition disabled:opacity-50">
+              {uploading?'⏳ Enviando...':'+ Adicionar logos'}
+            </button>
+          </div>
+          <input ref={fileRef} type="file" multiple accept="image/*" className="hidden" onChange={e=>uploadLogos(e.target.files)}/>
+          {(group.logos||[]).length>0?(
+            <div className="grid grid-cols-3 gap-2">
+              {group.logos.map((l,i)=>(
+                <div key={l.id} draggable onDragStart={()=>setDragIdx(i)} onDragOver={e=>e.preventDefault()} onDrop={()=>dropLogo(i)}
+                  className={`bg-white rounded-xl border shadow-sm overflow-hidden group cursor-grab ${dragIdx===i?'opacity-40 border-blue-400':'border-gray-100'}`}>
+                  <div className="h-16 bg-gray-50 flex items-center justify-center p-2 overflow-hidden">
+                    <img src={l.url} alt={l.name} className="max-w-full max-h-full object-contain"
+                      style={{transform:meta.rotation?`rotate(${meta.rotation}deg)`:''}}/>
+                  </div>
+                  <div className="px-2 py-1.5 flex items-center justify-between">
+                    <span className="text-xs text-gray-500 truncate">{l.name}</span>
+                    <button onClick={()=>delLogo(l.id)} className="text-red-400 hover:text-red-600 ml-1 opacity-0 group-hover:opacity-100 transition text-xs">✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ):(
+            <div onClick={()=>fileRef.current?.click()} className="border-2 border-dashed border-gray-200 hover:border-blue-300 rounded-xl p-6 text-center cursor-pointer transition">
+              <p className="text-xs text-gray-400">Clique para adicionar logos</p>
+            </div>
+          )}
+        </div>
+      </div>}
+    </div>
+  );
+}
+
+function SponsorsPage({sponsors:spData,onUpdate,showToast}){
+  const groups = spData?.groups || [];
+  const [newName,setNewName]=useState('');
+  const [newPos,setNewPos]=useState('bl');
+  const [creating,setCreating]=useState(false);
+  const [showNew,setShowNew]=useState(false);
+
+  const create=async()=>{
+    if(!newName.trim())return;
+    setCreating(true);
+    await api.createSponsorGroup({name:newName.trim(),position:newPos});
+    setCreating(false);setShowNew(false);setNewName('');setNewPos('bl');
+    onUpdate();showToast('Grupo criado!');
+  };
+
+  return(
+    <div className="p-4 md:p-6 fadein max-w-3xl">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold">🏆 Patrocinadores</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Grupos independentes em cada posição da tela</p>
+        </div>
+        <button onClick={()=>setShowNew(o=>!o)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+          {showNew?'✕ Cancelar':'+ Novo grupo'}
+        </button>
+      </div>
+
+      {/* Criar novo grupo */}
+      {showNew&&<div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-5 fadein">
+        <p className="text-sm font-semibold text-blue-800 mb-3">Novo grupo de patrocinadores</p>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Nome</label>
+            <input value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Ex: Patrocinadores Topo"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white"/>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Posição inicial</label>
+            <select value={newPos} onChange={e=>setNewPos(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white">
+              {SP_POSITIONS.map(p=><option key={p.v} value={p.v}>{p.l}</option>)}
+            </select>
+          </div>
+        </div>
+        <button onClick={create} disabled={creating||!newName.trim()} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50">
+          {creating?'Criando...':'✅ Criar grupo'}
+        </button>
+      </div>}
+
+      {/* Lista de grupos */}
+      {groups.length>0?(
+        <div className="space-y-3">
+          {groups.map(g=>(
+            <SponsorGroup key={g.id} group={g} onUpdate={onUpdate} showToast={showToast}/>
+          ))}
+        </div>
+      ):(
+        <div className="text-center py-16 text-gray-400">
+          <div className="text-5xl mb-3">🏆</div>
+          <p className="text-base font-medium">Nenhum grupo criado</p>
+          <p className="text-sm mt-1">Crie grupos para exibir patrocinadores em diferentes posições da TV</p>
+          <button onClick={()=>setShowNew(true)} className="mt-4 text-blue-500 text-sm hover:underline">Criar primeiro grupo</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function EmergencyPage({emergency,onUpdate,showToast}){
+  const [form,setForm]=useState({title:emergency?.title||'AVISO IMPORTANTE',message:emergency?.message||'',bg_color:emergency?.bg_color||'#dc2626',text_color:emergency?.text_color||'#ffffff'});
+  const [loading,setLoading]=useState(false);
+  useEffect(()=>{setForm({title:emergency?.title||'AVISO IMPORTANTE',message:emergency?.message||'',bg_color:emergency?.bg_color||'#dc2626',text_color:emergency?.text_color||'#ffffff'});},[emergency]);
+  const isActive=emergency?.active===1;
+  const toggle=async()=>{
+    setLoading(true);
+    await api.setEmergency({...form,active:isActive?0:1});
+    onUpdate();
+    setLoading(false);
+    showToast(isActive?'Emergência desativada':'🚨 Emergência ativada em todas as TVs!',isActive?'success':'error');
+    // Tocar sirene de aviso no painel ao ativar
+    if (!isActive) {
+      try {
+        const ctx = new (window.AudioContext||window.webkitAudioContext)();
+        const osc = ctx.createOscillator(); const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type='sawtooth'; gain.gain.setValueAtTime(0.18,ctx.currentTime);
+        osc.frequency.setValueAtTime(400,ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(800,ctx.currentTime+0.4);
+        osc.frequency.linearRampToValueAtTime(400,ctx.currentTime+0.8);
+        osc.frequency.linearRampToValueAtTime(800,ctx.currentTime+1.2);
+        gain.gain.linearRampToValueAtTime(0,ctx.currentTime+1.4);
+        osc.start(ctx.currentTime); osc.stop(ctx.currentTime+1.5);
+        setTimeout(()=>ctx.close(),2000);
+      } catch {}
+    }
+  };
+  const save=async()=>{await api.setEmergency({...form,active:isActive?1:0});onUpdate();showToast('Configurações salvas!');};
+  return (
+    <div className="p-4 md:p-6 fadein max-w-xl">
+      <h2 className="text-xl md:text-2xl font-bold mb-1">Tela de Emergência</h2>
+      <p className="text-gray-500 text-sm mb-5">Interrompe todas as TVs instantaneamente</p>
+      {isActive&&<div className="bg-red-50 border border-red-300 rounded-xl p-3 mb-4 flex items-center gap-2 text-red-700"><span className="text-xl">🚨</span><span className="font-semibold text-sm">Emergência ATIVA em todas as TVs</span></div>}
+      <div className="rounded-xl overflow-hidden mb-5 shadow">
+        <div className="relative flex flex-col items-center justify-center" style={{background:form.bg_color,padding:'28px 24px',minHeight:'120px',textAlign:'center'}}>
+          <div className="text-4xl mb-2">🚨</div>
+          <h3 className="font-black text-lg mb-1" style={{color:form.text_color}}>{form.title||'AVISO'}</h3>
+          <p style={{color:form.text_color,opacity:.9,fontSize:14}}>{form.message||'Mensagem de emergência aqui'}</p>
+          <div className="absolute top-2 right-2 text-xs px-2 py-0.5 rounded-full bg-black/20" style={{color:form.text_color}}>PRÉVIA</div>
+        </div>
+      </div>
+      <Lbl>Título</Lbl><Inp value={form.title} onChange={v=>setForm(f=>({...f,title:v}))}/>
+      <Lbl>Mensagem</Lbl><textarea value={form.message} onChange={e=>setForm(f=>({...f,message:e.target.value}))} rows={3} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm resize-none focus:outline-none focus:border-blue-400"/>
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div><Lbl>Cor de fundo</Lbl><input type="color" value={form.bg_color} onChange={e=>setForm(f=>({...f,bg_color:e.target.value}))} className="w-full h-10 rounded-lg border border-gray-200 cursor-pointer"/></div>
+        <div><Lbl>Cor do texto</Lbl><input type="color" value={form.text_color} onChange={e=>setForm(f=>({...f,text_color:e.target.value}))} className="w-full h-10 rounded-lg border border-gray-200 cursor-pointer"/></div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={save} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2.5 rounded-lg font-medium transition text-sm">💾 Salvar</button>
+        <button onClick={toggle} disabled={loading} className={`flex-1 py-2.5 rounded-lg font-semibold transition text-sm text-white disabled:opacity-50 ${isActive?'bg-green-600 hover:bg-green-700':'bg-red-600 hover:bg-red-700'}`}>{loading?'...':(isActive?'✅ Desativar':'🚨 ATIVAR AGORA')}</button>
+      </div>
+    </div>
+  );
+}
+
+// ── RELATÓRIOS ───────────────────────────────────────────────────
+function ReportsPage({tvs}){
+  const [tab,setTab]=useState('status');
+  const [status,setStatus]=useState([]);
+  const [playback,setPlayback]=useState([]);
+  const [audit,setAudit]=useState([]);
+  const [stats,setStats]=useState(null);
+  const [days,setDays]=useState(1);
+  const [filterTv,setFilterTv]=useState('');
+  const [loading,setLoading]=useState(false);
+
+  useEffect(()=>{
+    api.getReportStatus().then(r=>Array.isArray(r)&&setStatus(r)).catch(()=>{});
+    api.getReportStats().then(r=>!r?.error&&setStats(r)).catch(()=>{});
+  },[]);
+  useEffect(()=>{setLoading(true);api.getReportPlayback(filterTv,days).then(r=>Array.isArray(r)&&setPlayback(r)).catch(()=>{}).finally(()=>setLoading(false));},[days,filterTv]);
+  useEffect(()=>{if(tab==='audit')api.getAuditLog().then(r=>Array.isArray(r)&&setAudit(r)).catch(()=>{});},[tab]);
+
+  const tabs=[['status','📡 Status ao vivo'],['playback','▶ Log de reprodução'],['audit','📋 Auditoria']];
+
+  return (
+    <div className="p-4 md:p-6 fadein max-w-4xl">
+      <h2 className="text-xl md:text-2xl font-bold mb-5">Relatórios & Monitoramento</h2>
+      {stats&&<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <StatCard icon="📺" label="TVs" value={stats.tvCount} color="blue"/>
+        <StatCard icon="🟢" label="Online agora" value={stats.onlineCount} color="green"/>
+        <StatCard icon="▶" label="Reproduções hoje" value={stats.playsToday} color="yellow"/>
+        <StatCard icon="🏆" label="Mais tocada (7d)" value={stats.topMedia?.[0]?.video_name?.slice(0,16)||'—'} sub={stats.topMedia?.[0]?`${stats.topMedia[0].plays}x`:''} color="blue"/>
+      </div>}
+      <div className="flex gap-1.5 mb-4">
+        {tabs.map(([id,label])=>(
+          <button key={id} onClick={()=>setTab(id)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${tab===id?'bg-blue-600 text-white':'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'}`}>{label}</button>
+        ))}
+      </div>
+
+      {tab==='status'&&(
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100">
+            {status.length===0&&<p className="text-xs text-gray-400 text-center py-8">Nenhuma TV</p>}
+            {status.map(tv=>(
+              <div key={tv.id} className="flex items-center gap-3 p-3 hover:bg-gray-50">
+                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${tv.status==='online'?'bg-green-500':'bg-red-400'}`}/>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{tv.name}</p>
+                  {tv.status==='online'&&tv.current_video&&<p className="text-xs text-gray-500 truncate">▶ {tv.current_video}</p>}
+                  {tv.status==='offline'&&<p className="text-xs text-gray-400">{tv.minutesAgo===0?'Nunca visto':tv.minutesAgo<60?`${tv.minutesAgo}min atrás`:tv.minutesAgo<1440?`${Math.round(tv.minutesAgo/60)}h atrás`:`${Math.round(tv.minutesAgo/1440)}d atrás`}</p>}
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tv.status==='online'?'badge-online':'badge-offline'}`}>{tv.status==='online'?'● Online':'○ Offline'}</span>
+                  {tv.playlist_name&&<p className="text-xs text-gray-400 mt-0.5">{tv.playlist_name}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab==='playback'&&(
+        <div>
+          <div className="flex gap-2 mb-3">
+            <select value={days} onChange={e=>setDays(+e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white">
+              <option value={1}>Últimas 24h</option><option value={7}>7 dias</option><option value={30}>30 dias</option>
+            </select>
+            <select value={filterTv} onChange={e=>setFilterTv(e.target.value)} className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white">
+              <option value="">Todas as TVs</option>{tvs.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          {loading?<p className="text-xs text-gray-400 text-center py-8">Carregando...</p>:
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+              {playback.length===0&&<p className="text-xs text-gray-400 text-center py-8">Nenhum log neste período</p>}
+              {playback.map(p=>(
+                <div key={p.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 text-xs">
+                  <span>{p.media_type==='youtube'?'▶':p.media_type==='image'?'🖼':p.media_type==='pdf'?'📄':'🎬'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-800 truncate">{p.video_name||'—'}</p>
+                    <p className="text-gray-400">{p.tv_name||p.tv_id} · {fmt.dt(p.started_at)}</p>
+                  </div>
+                  {p.duration_sec>0&&<span className="text-gray-400 flex-shrink-0">{fmt.dur(p.duration_sec)}</span>}
+                </div>
+              ))}
+            </div>
+          </div>}
+        </div>
+      )}
+
+      {tab==='audit'&&(
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+            {audit.length===0&&<p className="text-xs text-gray-400 text-center py-8">Nenhum registro</p>}
+            {audit.map(a=>(
+              <div key={a.id} className="flex items-start gap-3 p-3 hover:bg-gray-50 text-xs">
+                <span className="text-gray-400 flex-shrink-0">{fmt.dt(a.created_at)}</span>
+                <div className="flex-1">
+                  <span className="font-medium text-gray-700">{a.user||'sistema'}</span>
+                  <span className="text-gray-500 mx-1">→</span>
+                  <span className="text-blue-600">{a.action}</span>
+                  {a.target&&<span className="text-gray-600 ml-1">"{a.target}"</span>}
+                  {a.detail&&<span className="text-gray-400 ml-1">({a.detail})</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── USUÁRIOS ─────────────────────────────────────────────────────
+function UsersPage({showToast}){
+  const [users,setUsers]=useState([]);
+  const [modal,setModal]=useState(false);const [edit,setEdit]=useState(null);
+  const [form,setForm]=useState({username:'',password:'',role:'operator'});
+  const load=async()=>{const r=await api.getUsers();Array.isArray(r)&&setUsers(r);};
+  useEffect(()=>{load();},[]);
+  const open=(u=null)=>{setEdit(u);setForm(u?{username:u.username,password:'',role:u.role}:{username:'',password:'',role:'operator'});setModal(true);};
+  const save=async()=>{
+    if(!form.username.trim())return;
+    if(!edit&&!form.password.trim()){showToast('Senha obrigatória','error');return;}
+    const d={username:form.username,role:form.role};
+    if(form.password)d.password=form.password;
+    const r=edit?await api.updateUser(edit.id,d):await api.createUser(d);
+    if(r.error){showToast(r.error,'error');return;}
+    setModal(false);load();showToast(edit?'Usuário atualizado!':'Usuário criado!');
+  };
+  const del=async u=>{if(!confirm(`Remover ${u.username}?`))return;await api.deleteUser(u.id);load();showToast('Removido');};
+  const roleColor={admin:'bg-red-100 text-red-700',operator:'bg-blue-100 text-blue-700',viewer:'bg-gray-100 text-gray-700'};
+  const roleLabel={admin:'Admin',operator:'Operador',viewer:'Visualizador'};
+  return (
+    <div className="p-4 md:p-6 fadein max-w-2xl">
+      <div className="flex items-center justify-between mb-5">
+        <div><h2 className="text-xl md:text-2xl font-bold">Usuários</h2><p className="text-gray-500 text-sm">Gerenciar acesso ao painel</p></div>
+        <button onClick={()=>open()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Novo</button>
+      </div>
+      <div className="bg-blue-50 rounded-xl p-3 mb-4 text-xs text-blue-700">
+        <p>🔐 <strong>Admin:</strong> Acesso total · <strong>Operador:</strong> Gerencia conteúdo · <strong>Visualizador:</strong> Apenas leitura</p>
+      </div>
+      <div className="space-y-2">
+        {users.map(u=>(
+          <div key={u.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+            <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-lg flex-shrink-0">
+              {u.role==='admin'?'👑':u.role==='operator'?'👤':'👁'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm">{u.username}</p>
+              <p className="text-xs text-gray-400">Criado em {fmt.dt(u.created_at)}</p>
+            </div>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${roleColor[u.role]||'bg-gray-100 text-gray-600'}`}>{roleLabel[u.role]||u.role}</span>
+            <div className="flex gap-1.5 flex-shrink-0">
+              <button onClick={()=>open(u)} className="text-xs border border-gray-200 px-2.5 py-1.5 rounded-lg hover:border-blue-300 hover:text-blue-600 transition">✏️</button>
+              {u.username!=='admin'&&<button onClick={()=>del(u)} className="text-xs text-red-400 border border-gray-200 px-2.5 py-1.5 rounded-lg transition">🗑</button>}
+            </div>
+          </div>
+        ))}
+        {users.length===0&&<p className="text-center text-gray-400 py-8">Nenhum usuário</p>}
+      </div>
+      {modal&&<Modal title={edit?`Editar — ${edit.username}`:'Novo Usuário'} onClose={()=>setModal(false)} onSave={save}>
+        <Lbl>Nome de usuário</Lbl><Inp value={form.username} onChange={v=>setForm(f=>({...f,username:v}))} disabled={edit?.username==='admin'}/>
+        <Lbl>{edit?'Nova senha (deixe vazio para manter)':'Senha'}</Lbl><Inp value={form.password} onChange={v=>setForm(f=>({...f,password:v}))} type="password" placeholder={edit?'••••••••':'Mínimo 6 caracteres'}/>
+        <Lbl>Nível de acesso</Lbl>
+        <Sel value={form.role} onChange={v=>setForm(f=>({...f,role:v}))}>
+          <option value="admin">👑 Admin — Acesso total</option>
+          <option value="operator">👤 Operador — Gerencia conteúdo</option>
+          <option value="viewer">👁 Visualizador — Apenas leitura</option>
+        </Sel>
+      </Modal>}
+    </div>
+  );
+}
+
+// ── APARÊNCIA ────────────────────────────────────────────────────
+const THEMES_PRESET = [
+  {name:'Escuro padrão',  sidebarBg:'#111827',sidebarText:'#9ca3af',sidebarActive:'#2563eb',accentColor:'#2563eb'},
+  {name:'Azul oceano',    sidebarBg:'#0c1a3a',sidebarText:'#93c5fd',sidebarActive:'#3b82f6',accentColor:'#3b82f6'},
+  {name:'Verde floresta', sidebarBg:'#052e16',sidebarText:'#86efac',sidebarActive:'#16a34a',accentColor:'#16a34a'},
+  {name:'Roxo elegante',  sidebarBg:'#1e1b4b',sidebarText:'#c4b5fd',sidebarActive:'#7c3aed',accentColor:'#7c3aed'},
+  {name:'Grafite',        sidebarBg:'#1c1c1e',sidebarText:'#8e8e93',sidebarActive:'#ff9f0a',accentColor:'#ff9f0a'},
+  {name:'Vermelho forte', sidebarBg:'#1c0a0a',sidebarText:'#fca5a5',sidebarActive:'#dc2626',accentColor:'#dc2626'},
+  {name:'Branco limpo',   sidebarBg:'#ffffff',sidebarText:'#6b7280',sidebarActive:'#2563eb',accentColor:'#2563eb'},
+  {name:'Marrom madeira', sidebarBg:'#292118',sidebarText:'#d6c8b0',sidebarActive:'#d97706',accentColor:'#d97706'},
+];
+
+function AppearancePage({theme,setTheme,showToast}){
+  const [form,setForm]=useState({...theme});
+  const [saving,setSaving]=useState(false);
+  const [logoUploading,setLogoUploading]=useState(false);
+  const fileRef=useRef();
+  const restoreRef=useRef();
+
+  // ── Backup / Restore ────────────────────────────────────────────
+  const [restoring,setRestoring]=useState(false);
+  const [restoreResult,setRestoreResult]=useState(null);
+
+  const doBackup=async()=>{
+    try{
+      const h={};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;
+      const r=await fetch(`${API}/backup`,{headers:h});
+      if(!r.ok){showToast('Erro ao gerar backup','error');return;}
+      const blob=await r.blob();
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download=`indoortv-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('✅ Backup baixado com sucesso!');
+    }catch(e){showToast('Erro: '+e.message,'error');}
+  };
+
+  const doRestore=async file=>{
+    if(!file)return;
+    if(!confirm('Restaurar backup? Dados existentes com o mesmo ID serão mantidos — novos serão adicionados.'))return;
+    setRestoring(true);setRestoreResult(null);
+    try{
+      const text=await file.text();
+      const data=JSON.parse(text);
+      const h={};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;h['Content-Type']='application/json';
+      const r=await fetch(`${API}/backup/restore`,{method:'POST',headers:h,body:JSON.stringify(data)});
+      const j=await r.json();
+      if(j.error){showToast(j.error,'error');setRestoring(false);return;}
+      setRestoreResult(j.report);
+      showToast('✅ Backup restaurado!');
+    }catch(e){showToast('Arquivo inválido: '+e.message,'error');}
+    setRestoring(false);
+  };
+
+  useEffect(()=>setForm({...theme}),[theme]);
+
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  const uploadPanelLogo=async file=>{
+    if(!file)return;
+    setLogoUploading(true);
+    try{
+      const r=await api.uploadLogo(file,'panel');
+      if(r.url)set('panelLogo',r.url);
+      else if(r.error)showToast(r.error,'error');
+    }catch(e){showToast('Erro no upload','error');}
+    setLogoUploading(false);
+  };
+
+  const save=async()=>{
+    setSaving(true);
+    try{
+      await api.saveSettings(form);
+      setTheme(form);
+      showToast('🎨 Aparência salva com sucesso!');
+    }catch{showToast('Erro ao salvar','error');}
+    setSaving(false);
+  };
+
+  const removeLogo=async()=>{
+    set('panelLogo','');
+  };
+
+  // Preview da sidebar
+  const PreviewSidebar=()=>(
+    <div className="rounded-xl overflow-hidden shadow-xl" style={{width:150,background:form.sidebarBg,minHeight:280,display:'flex',flexDirection:'column'}}>
+      <div style={{padding:'14px 12px',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
+        {form.panelLogo
+          ? <img src={form.panelLogo} alt="Logo" style={{height:28,maxWidth:110,objectFit:'contain',borderRadius:3}}/>
+          : <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <span style={{fontSize:20}}>📺</span>
+              <span style={{fontWeight:700,fontSize:12,color:'#fff'}}>{form.panelName||'Indoor TV'}</span>
+            </div>
+        }
+        <p style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2}}>admin</p>
+      </div>
+      <div style={{padding:8,flex:1,display:'flex',flexDirection:'column',gap:2}}>
+        {['Dashboard','TVs','Mídias','Playlists'].map((l,i)=>(
+          <div key={l} style={{
+            padding:'7px 10px',borderRadius:8,fontSize:11,
+            background:i===0?form.sidebarActive:'transparent',
+            color:i===0?'#fff':form.sidebarText,
+          }}>{l}</div>
+        ))}
+      </div>
+      <div style={{padding:8,borderTop:'1px solid rgba(255,255,255,.07)'}}>
+        <div style={{padding:'6px 10px',borderRadius:8,fontSize:10,background:'rgba(255,255,255,.06)',color:form.sidebarText,textAlign:'center'}}>🔄 Recarregar TVs</div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="p-4 md:p-6 fadein max-w-3xl">
+      <h2 className="text-xl md:text-2xl font-bold mb-1">🎨 Aparência do Painel</h2>
+      <p className="text-gray-500 text-sm mb-6">Personalize cores, logo e nome do sistema</p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Coluna esquerda — configurações */}
+        <div className="space-y-5">
+
+          {/* Logo do painel */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <h3 className="font-semibold text-sm mb-3">🖼 Logo do painel</h3>
+            <div onClick={()=>fileRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition mb-3 ${form.panelLogo?'border-green-300 bg-green-50':'border-gray-200 hover:border-blue-300'}`}>
+              {logoUploading
+                ? <p className="text-sm text-blue-600">⏳ Enviando...</p>
+                : form.panelLogo
+                  ? <div>
+                      <img src={form.panelLogo} alt="Logo" className="mx-auto mb-2" style={{maxHeight:52,maxWidth:'100%',objectFit:'contain'}}/>
+                      <p className="text-xs text-green-600 font-medium">✅ Clique para trocar</p>
+                    </div>
+                  : <div><div className="text-2xl mb-1">🖼</div><p className="text-sm text-gray-500">Clique para enviar</p><p className="text-xs text-gray-400">PNG, JPG, GIF, WebP · Máx. 10 MB</p></div>
+              }
+            </div>
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" className="hidden"
+              onChange={e=>uploadPanelLogo(e.target.files?.[0])}/>
+            {form.panelLogo
+              ? <button onClick={removeLogo} className="w-full text-xs text-red-500 border border-red-200 rounded-lg py-1.5 hover:bg-red-50 transition">🗑 Remover logo</button>
+              : <>
+                  <Lbl>Nome exibido (sem logo)</Lbl>
+                  <Inp value={form.panelName||''} onChange={v=>set('panelName',v)} placeholder="Indoor TV"/>
+                </>
+            }
+          </div>
+
+          {/* Presets de tema */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <h3 className="font-semibold text-sm mb-3">⚡ Temas prontos</h3>
+            <div className="grid grid-cols-2 gap-1.5">
+              {THEMES_PRESET.map(t=>(
+                <button key={t.name} onClick={()=>setForm(f=>({...f,...t}))}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-gray-200 hover:border-blue-300 transition text-xs text-left">
+                  <div className="flex gap-0.5 flex-shrink-0">
+                    <div style={{width:10,height:20,background:t.sidebarBg,borderRadius:'3px 0 0 3px'}}/>
+                    <div style={{width:10,height:20,background:t.sidebarActive,borderRadius:'0 3px 3px 0'}}/>
+                  </div>
+                  <span className="truncate">{t.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cores personalizadas */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <h3 className="font-semibold text-sm mb-3">🖌 Cores personalizadas</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ['sidebarBg',   'Fundo da sidebar'],
+                ['sidebarText', 'Texto inativo'],
+                ['sidebarActive','Item ativo'],
+                ['accentColor', 'Cor de destaque'],
+              ].map(([k,label])=>(
+                <div key={k}>
+                  <Lbl>{label}</Lbl>
+                  <div className="flex items-center gap-2 mb-3">
+                    <input type="color" value={form[k]||'#000000'} onChange={e=>set(k,e.target.value)}
+                      className="w-10 h-9 rounded border border-gray-200 cursor-pointer flex-shrink-0"/>
+                    <input type="text" value={form[k]||''} onChange={e=>set(k,e.target.value)}
+                      className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-400" placeholder="#000000"/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Coluna direita — preview */}
+        <div>
+          <div className="sticky top-4">
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
+              <h3 className="font-semibold text-sm mb-3">👁 Preview ao vivo</h3>
+              <div className="flex justify-center">
+                <PreviewSidebar/>
+              </div>
+              <p className="text-xs text-gray-400 text-center mt-3">Reflita as alterações em tempo real</p>
+            </div>
+            <button onClick={save} disabled={saving}
+              className="w-full py-3 rounded-xl text-white font-semibold transition disabled:opacity-50 shadow-lg"
+              style={{background:form.accentColor||'#2563eb',boxShadow:`0 4px 14px ${(form.accentColor||'#2563eb')}44`}}>
+              {saving?'Salvando...':'💾 Salvar aparência'}
+            </button>
+            <p className="text-xs text-gray-400 text-center mt-2">As cores são aplicadas imediatamente ao salvar</p>
+
+            {/* ── Backup / Restore ── */}
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <h3 className="font-semibold text-gray-800 mb-1">📦 Backup e Restauração</h3>
+              <p className="text-xs text-gray-400 mb-4">Salva TVs cadastradas, playlists e agendamentos. <strong>Não inclui arquivos de mídia.</strong></p>
+              <div className="flex gap-3">
+                <button onClick={doBackup}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 text-sm font-semibold transition">
+                  ⬇️ Baixar backup
+                </button>
+                <button onClick={()=>restoreRef.current?.click()} disabled={restoring}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-green-200 text-green-700 bg-green-50 hover:bg-green-100 text-sm font-semibold transition disabled:opacity-50">
+                  {restoring?'⏳ Restaurando…':'⬆️ Restaurar backup'}
+                </button>
+                <input ref={restoreRef} type="file" accept=".json" className="hidden"
+                  onChange={e=>{doRestore(e.target.files?.[0]);e.target.value='';}}/>
+              </div>
+              {restoreResult&&<div className="mt-3 bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-600">
+                <p className="font-semibold text-gray-800 mb-1">✅ Restauração concluída:</p>
+                <div className="grid grid-cols-3 gap-1">
+                  {[['TVs',restoreResult.tvs],['Playlists',restoreResult.playlists],['Vínculos',restoreResult.playlist_videos],['Agendamentos',restoreResult.schedules],['Widgets',restoreResult.widgets],['Ignorados',restoreResult.skipped]].map(([l,v])=>(
+                    <div key={l} className="bg-white rounded-lg p-2 text-center border border-gray-100">
+                      <div className="text-lg font-bold text-gray-800">{v}</div>
+                      <div className="text-gray-400">{l}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

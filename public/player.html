@@ -1,0 +1,1844 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indoor TV Player</title>
+  <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{cursor:none !important;overflow:hidden;}
+    body{background:#000;overflow:hidden;font-family:Arial,sans-serif;}
+
+    /* ── Modo retrato ─────────────────────────────────────────────
+       Estratégia: #stage tem dimensões TROCADAS (100vh × 100vw),
+       centralizado com top/left 50% + translate(-50%,-50%),
+       depois rotacionado em torno do próprio centro.
+       Resultado: preenche a tela e o conteúdo renderiza em portrait.
+    ─────────────────────────────────────────────────────────────── */
+    #stage {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    /* TV com base na ESQUERDA (TV virada 90° horário) */
+    body.portrait-left #stage {
+      width:  100vh;
+      height: 100vw;
+      top:  50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-90deg);
+    }
+    /* TV com base na DIREITA (TV virada 90° anti-horário) */
+    body.portrait-right #stage {
+      width:  100vh;
+      height: 100vw;
+      top:  50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(90deg);
+    }
+
+    /* Overlay setup */
+    .overlay{position:absolute;inset:0;background:linear-gradient(135deg,#1a1a2e,#0f3460);display:flex;align-items:center;justify-content:center;z-index:2000;}
+    .box{background:rgba(255,255,255,.06);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.12);padding:36px;border-radius:20px;max-width:440px;width:90%;text-align:center;color:#fff;}
+    .box h1{font-size:22px;margin-bottom:8px;}
+    .box p{color:rgba(255,255,255,.6);font-size:13px;margin-bottom:22px;}
+    .box select{width:100%;padding:11px 14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;color:#fff;font-size:13px;margin-bottom:10px;outline:none;}
+    .box select option{background:#1a1a2e;}
+    .btn-primary{width:100%;padding:12px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px;}
+    .btn-primary:hover{background:#2563eb;}
+    .spinner{width:38px;height:38px;border:3px solid rgba(255,255,255,.15);border-top-color:#3b82f6;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 18px;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .btn-group{display:flex;gap:8px;margin-top:8px;}
+    .btn-group button{flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;}
+    .btn-sec{background:rgba(255,255,255,.15);color:#fff;}
+
+    /* Mídia */
+    #media-container{width:100%;height:100%;position:relative;background:#000;overflow:hidden;}
+    #media-rot-wrap{position:absolute;top:0;left:0;width:100%;height:100%;}
+
+    #video-player{width:100%;height:100%;object-fit:contain;opacity:0;-webkit-transition:opacity .5s;transition:opacity .5s;}
+    #video-player.active{opacity:1;}
+    /* Canvas usado quando Tizen não consegue rotacionar <video> via CSS */
+    #video-canvas{display:none;position:absolute;top:0;left:0;width:100%;height:100%;}
+    #image-player{width:100%;height:100%;object-fit:contain;display:none;opacity:0;-webkit-transition:opacity .5s;transition:opacity .5s;}
+    #image-player.active{opacity:1;}
+    #youtube-wrap{width:100%;height:100%;display:none;background:#000;}
+    #youtube-player{width:100%;height:100%;}
+    #pdf-player{width:100%;height:100%;display:none;border:none;background:#111;}
+    /* Aviso de rotação não suportada (YouTube no Tizen) */
+    #rot-warn{display:none;position:absolute;bottom:12px;left:50%;-webkit-transform:translateX(-50%);transform:translateX(-50%);background:rgba(0,0,0,.7);color:#fbbf24;font-size:13px;padding:6px 14px;border-radius:8px;z-index:500;white-space:nowrap;}
+
+    /* Transições */
+    @keyframes slideInR{from{transform:translateX(100%)}to{transform:translateX(0)}}
+    @keyframes slideInL{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+    @keyframes zoomIn  {from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+    .t-right{animation:slideInR .5s ease}
+    .t-left {animation:slideInL .5s ease}
+    .t-zoom {animation:zoomIn   .5s ease}
+
+    /* Emergência */
+    #emergency-overlay{position:absolute;inset:0;z-index:1800;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;}
+    #emergency-overlay.show{display:flex;}
+    #emergency-overlay h1{font-size:clamp(28px,5vw,64px);font-weight:900;margin-bottom:16px;}
+    #emergency-overlay p{font-size:clamp(16px,2.5vw,32px);opacity:.9;max-width:700px;}
+    #em-icon{font-size:clamp(48px,8vw,96px);margin-bottom:20px;animation:emp 1s ease-in-out infinite;}
+    @keyframes emp{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+
+    /* Widgets */
+    .w-bar{position:absolute;left:0;right:0;z-index:900;display:flex;align-items:center;overflow:hidden;}
+    .w-bar.pos-bottom{bottom:0;background:rgba(0,0,0,.82);}
+    .w-bar.pos-top   {top:0;background:rgba(0,0,0,.82);}
+    .w-corner{position:absolute;z-index:900;background:rgba(0,0,0,.78);border-radius:10px;padding:10px 14px;}
+    .w-corner.pos-corner-tr{top:16px;right:16px;}
+    .w-corner.pos-corner-br{bottom:16px;right:16px;}
+    .w-free{position:absolute;z-index:900;background:rgba(0,0,0,.78);border-radius:10px;padding:10px 14px;cursor:grab;user-select:none;touch-action:none;transform:translate(-50%,-50%);}
+    .w-free.dragging{cursor:grabbing;opacity:.85;}
+    .w-full{position:absolute;inset:0;z-index:800;}
+    .w-full iframe{width:100%;height:100%;border:none;}
+    /* ── Barras laterais ───────────────────────────────────────── */
+    /* Estratégia: a barra ocupa a altura total da tela.
+       Dentro dela existe um .w-side-inner girado 90°/-90° com
+       width = altura da tela, para que o ticker horizontal dentro
+       dele apareça como rolar vertical na tela. */
+    .w-side{position:absolute;top:0;bottom:0;z-index:900;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+    .w-side.pos-side-left {left:0;background:rgba(0,0,0,.82);}
+    .w-side.pos-side-right{right:0;background:rgba(0,0,0,.82);}
+    /* inner: largura definida via JS = altura da tela */
+    .w-side .w-side-inner{flex-shrink:0;display:flex;align-items:center;overflow:hidden;transform-origin:center center;}
+    .w-side.pos-side-left  .w-side-inner{transform:rotate(90deg);}
+    .w-side.pos-side-right .w-side-inner{transform:rotate(-90deg);}
+    @keyframes ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+    /* Ticker */
+    @keyframes ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+    /* Barra de progresso */
+    #prog-wrap{position:absolute;bottom:0;left:0;right:0;height:4px;background:rgba(255,255,255,.1);z-index:950;display:none;}
+    #prog-bar{height:100%;background:#3b82f6;width:0%;transition:width .1s linear;}
+
+    /* Controles flutuantes */
+    #ctrl{position:absolute;bottom:14px;right:14px;z-index:950;display:flex;gap:8px;opacity:0;transition:opacity .3s;}
+    #ctrl.show{opacity:1;}
+    .cb{background:rgba(0,0,0,.78);color:#fff;border:none;border-radius:8px;padding:9px 13px;cursor:pointer;font-size:15px;backdrop-filter:blur(4px);transition:background .2s;}
+    .cb:hover{background:rgba(59,130,246,.8);}
+
+    /* Toasts */
+    #update-banner{position:absolute;top:0;left:0;right:0;background:#3b82f6;color:#fff;text-align:center;padding:8px;font-size:12px;font-weight:600;z-index:1900;transform:translateY(-100%);transition:transform .3s;}
+    #update-banner.show{transform:translateY(0);}
+    #toast{position:absolute;bottom:60px;left:20px;background:rgba(0,0,0,.85);color:#fff;padding:9px 14px;border-radius:8px;font-size:12px;z-index:1700;opacity:0;transition:opacity .3s;}
+    #toast.show{opacity:1;}
+
+    /* ── Cards especiais na playlist ─────────────────────────── */
+    /* ── Patrocinadores ─────────────────────────────────────── */
+    .sp-group{position:absolute;z-index:800;pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+    .sp-group img{position:absolute;object-fit:contain;width:calc(100% - 12px);height:calc(100% - 12px);opacity:0;transition:opacity .6s ease;}
+    /* Posições */
+    .sp-pos-bl{bottom:12px;left:12px;}
+    .sp-pos-br{bottom:12px;right:12px;}
+    .sp-pos-tl{top:12px;left:12px;}
+    .sp-pos-tr{top:12px;right:12px;}
+    .sp-pos-bc{bottom:0;left:0;right:0;width:100% !important;justify-content:center;padding:8px 0;}
+    .sp-pos-tc{top:0;left:0;right:0;width:100% !important;justify-content:center;padding:8px 0;}
+    .sp-pos-center{top:50%;left:50%;transform:translate(-50%,-50%);}
+    /* ── Player de Áudio ────────────────────────────────────── */
+    #audio-player-wrap{position:absolute;inset:0;z-index:500;display:none;align-items:center;justify-content:center;flex-direction:column;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%);}
+    #audio-player-wrap.active{display:flex;}
+    .ap-disc{width:min(38vw,38vh);height:min(38vw,38vh);border-radius:50%;background:linear-gradient(135deg,#312e81,#4c1d95);display:flex;align-items:center;justify-content:center;box-shadow:0 0 60px rgba(139,92,246,0.4);animation:ap-spin 8s linear infinite;animation-play-state:paused;}
+    .ap-disc.playing{animation-play-state:running;}
+    @keyframes ap-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    .ap-disc-inner{width:35%;height:35%;border-radius:50%;background:#0f172a;box-shadow:inset 0 0 10px rgba(0,0,0,0.5);}
+    .ap-bars{display:flex;align-items:flex-end;gap:min(.6vw,.6vh);height:min(5vw,5vh);margin:min(2vw,2vh) 0;}
+    .ap-bar{width:min(.7vw,.7vh);background:#8b5cf6;border-radius:2px;animation:ap-bar 1s ease-in-out infinite;animation-play-state:paused;}
+    .ap-bars.playing .ap-bar{animation-play-state:running;}
+    @keyframes ap-bar{0%,100%{height:20%}50%{height:100%}}
+    .ap-bar:nth-child(2){animation-delay:.1s}.ap-bar:nth-child(3){animation-delay:.2s}.ap-bar:nth-child(4){animation-delay:.3s}.ap-bar:nth-child(5){animation-delay:.15s}.ap-bar:nth-child(6){animation-delay:.25s}.ap-bar:nth-child(7){animation-delay:.05s}
+    .ap-title{color:#fff;font-size:min(2.2vw,2.2vh);font-weight:700;text-align:center;max-width:70%;margin:0;letter-spacing:-.02em;text-shadow:0 2px 8px rgba(0,0,0,.5);}
+    .ap-progress-wrap{width:60%;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:min(1.5vw,1.5vh) 0;}
+    .ap-progress{height:100%;background:linear-gradient(90deg,#8b5cf6,#a78bfa);border-radius:2px;width:0%;transition:width .5s linear;}
+    #card-player{position:absolute;inset:0;z-index:500;display:none;opacity:0;transition:opacity .5s;overflow:hidden;}
+    #card-player.active{opacity:1;}
+
+    /* Clock card */
+    .card-clock{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+    .card-clock .cc-time{font-size:clamp(80px,min(18vw,18vh),220px);font-weight:900;line-height:1;letter-spacing:-2px;font-variant-numeric:tabular-nums;}
+    .card-clock .cc-date{font-size:clamp(22px,min(4vw,4vh),54px);opacity:.7;margin-top:16px;text-transform:capitalize;font-weight:400;}
+    .card-clock .cc-label{font-size:clamp(14px,min(2.5vw,2.5vh),32px);opacity:.45;margin-top:12px;letter-spacing:3px;text-transform:uppercase;}
+
+    /* Weather card */
+    .card-weather{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:0;}
+    .card-weather .cw-icon{font-size:clamp(72px,min(14vw,14vh),180px);line-height:1;margin-bottom:8px;filter:drop-shadow(0 4px 24px rgba(0,0,0,.3));}
+    .card-weather .cw-temp{font-size:clamp(80px,min(16vw,16vh),200px);font-weight:900;line-height:1;letter-spacing:-2px;}
+    .card-weather .cw-desc{font-size:clamp(20px,min(3.5vw,3.5vh),48px);opacity:.75;margin-top:8px;}
+    .card-weather .cw-city{font-size:clamp(14px,min(2.5vw,2.5vh),32px);opacity:.5;margin-top:8px;letter-spacing:2px;text-transform:uppercase;}
+    .card-weather .cw-extra{font-size:clamp(13px,min(2vw,2vh),26px);opacity:.45;margin-top:10px;display:flex;gap:24px;justify-content:center;}
+
+    /* Slide card */
+    .card-slide{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:clamp(32px,min(6vw,6vh),96px);}
+    .card-slide .cs-icon{font-size:clamp(48px,min(8vw,8vh),100px);margin-bottom:clamp(16px,min(3vw,3vh),40px);line-height:1;}
+    .card-slide .cs-title{font-size:clamp(32px,min(7vw,7vh),100px);font-weight:900;line-height:1.05;margin-bottom:clamp(12px,min(2.5vw,2.5vh),32px);}
+    .card-slide .cs-subtitle{font-size:clamp(18px,min(3.5vw,3.5vh),52px);opacity:.75;margin-bottom:clamp(10px,min(2vw,2vh),28px);font-weight:500;}
+    .card-slide .cs-body{font-size:clamp(14px,min(2.5vw,2.5vh),36px);opacity:.65;line-height:1.55;max-width:800px;}
+    .card-slide .cs-image{width:100%;height:100%;object-fit:cover;position:absolute;inset:0;z-index:-1;}
+    .card-slide .cs-image-right{position:absolute;right:0;top:0;height:100%;width:45%;object-fit:cover;z-index:-1;}
+
+    /* Weather + Clock card combinado */
+    .card-wc{width:100%;height:100%;display:grid;grid-template-columns:1fr 1px 1fr;align-items:center;gap:0;}
+    .card-wc .wc-divider{height:55%;align-self:center;background:rgba(255,255,255,.12);}
+    /* Lado clima */
+    .card-wc .wc-left{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:clamp(24px,min(4vw,4vh),64px);}
+    .card-wc .wc-icon{font-size:clamp(56px,min(10vw,10vh),130px);line-height:1;margin-bottom:6px;}
+    .card-wc .wc-temp{font-size:clamp(64px,min(12vw,12vh),160px);font-weight:900;line-height:1;letter-spacing:-2px;}
+    .card-wc .wc-desc{font-size:clamp(16px,min(2.5vw,2.5vh),36px);opacity:.7;margin-top:6px;}
+    .card-wc .wc-city{font-size:clamp(12px,min(1.8vw,1.8vh),26px);opacity:.45;margin-top:6px;letter-spacing:2px;text-transform:uppercase;}
+    .card-wc .wc-extra{font-size:clamp(11px,min(1.5vw,1.5vh),22px);opacity:.4;margin-top:8px;display:flex;gap:16px;justify-content:center;}
+    /* Lado relógio */
+    .card-wc .wc-right{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:clamp(24px,min(4vw,4vh),64px);}
+    .card-wc .wc-time{font-size:clamp(60px,min(11vw,11vh),150px);font-weight:900;line-height:1;letter-spacing:-2px;font-variant-numeric:tabular-nums;}
+    .card-wc .wc-date{font-size:clamp(14px,min(2.2vw,2.2vh),32px);opacity:.65;margin-top:12px;text-transform:capitalize;font-weight:400;line-height:1.3;}
+    /* Layout vertical (empilhado) — alternativo */
+    .card-wc.layout-stack{grid-template-columns:1fr;grid-template-rows:1fr 1px 1fr;}
+    .card-wc.layout-stack .wc-divider{width:55%;height:1px;justify-self:center;align-self:auto;}
+
+    .hidden{display:none!important;}
+  </style>
+</head>
+<body>
+<div id="stage">
+
+<!-- Setup -->
+<div id="overlay" class="overlay">
+  <div class="box">
+    <div style="font-size:40px;margin-bottom:12px">📺</div>
+    <h1>Indoor TV Player</h1>
+    <p id="overlay-msg">Inicializando...</p>
+    <div id="spinner" class="spinner"></div>
+    <div id="setup-form" class="hidden">
+      <select id="tv-select"><option value="">Selecione uma TV</option></select>
+      <button class="btn-primary" id="connect-btn">▶ Conectar</button>
+    </div>
+    <div id="error-btns" class="btn-group hidden">
+      <button class="btn-sec" id="reset-btn">🔄 Reconfigurar</button>
+      <button class="btn-primary" id="retry-btn">Tentar novamente</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mídia -->
+<div id="media-container" class="hidden">
+  <div id="media-rot-wrap">
+    <video  id="video-player" autoplay muted playsinline></video>
+    <canvas id="video-canvas"></canvas>
+    <img    id="image-player" alt=""/>
+    <div    id="youtube-wrap"><div id="youtube-player"></div></div>
+    <iframe id="pdf-player" title="PDF"></iframe>
+    <audio id="audio-src" preload="auto"></audio>
+    <div id="audio-player-wrap">
+      <div class="ap-disc" id="ap-disc"><div class="ap-disc-inner"></div></div>
+      <div class="ap-bars" id="ap-bars">
+        <div class="ap-bar"></div><div class="ap-bar"></div><div class="ap-bar"></div>
+        <div class="ap-bar"></div><div class="ap-bar"></div><div class="ap-bar"></div><div class="ap-bar"></div>
+      </div>
+      <p class="ap-title" id="ap-title">♪</p>
+      <div class="ap-progress-wrap"><div class="ap-progress" id="ap-progress"></div></div>
+    </div>
+  </div>
+  <div id="rot-warn">⚠️ Rotação de vídeo não suportada neste browser</div>
+</div>
+
+<!-- Cards especiais da playlist (clock, weather, slide) -->
+<div id="card-player"></div>
+
+<!-- Emergência -->
+<div id="emergency-overlay"></div>
+
+<!-- Widgets -->
+<div id="widgets-container"></div>
+
+<!-- UI -->
+<div id="prog-wrap"><div id="prog-bar"></div></div>
+
+<div id="update-banner">🔄 Atualizando...</div>
+<div id="toast"></div>
+
+<script>
+const API = window.location.origin + '/api';
+
+// ── Estado ──────────────────────────────────────────────────────
+let cfg       = {tvId:null,tvName:null};
+let playlist  = [];
+let widgets   = [];
+let emergency = {active:0};
+let tvConf    = {};
+let curIdx    = 0;
+let shuffleMode = false;
+let shuffleOrder = []; // índices embaralhados
+let isPlaying = false;
+let socket    = null;
+let ytPlayer  = null, ytReady = false;
+let imgTimer  = null, imgProgT = null;
+let syncTimer = null, hbTimer  = null, wTimer = null;
+let curVol    = 100, isMuted  = false;
+let audioCtx  = null, sirenNode = null;
+
+// ── YouTube ──────────────────────────────────────────────────────
+window.onYouTubeIframeAPIReady = () => {
+  ytReady = true;
+  ytPlayer = new YT.Player('youtube-player', {
+    width:'100%', height:'100%',
+    playerVars:{autoplay:1,controls:0,modestbranding:1,rel:0,iv_load_policy:3,fs:0,disablekb:1,playsinline:1},
+    events:{
+      onStateChange: e => { if(e.data===YT.PlayerState.ENDED) nextItem(); },
+      onError: ()=>{ toast('⚠️ Erro YouTube'); setTimeout(nextItem,2000); }
+    }
+  });
+};
+
+// ── DOM ─────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const el = {
+  overlay:$('overlay'), overlayMsg:$('overlay-msg'), spinner:$('spinner'),
+  setupForm:$('setup-form'), errorBtns:$('error-btns'), tvSelect:$('tv-select'),
+  media:$('media-container'), rotWrap:$('media-rot-wrap'),
+  video:$('video-player'), canvas:$('video-canvas'), image:$('image-player'),
+  ytWrap:$('youtube-wrap'), pdfPlayer:$('pdf-player'),
+  audioSrc:$('audio-src'), audioWrap:$('audio-player-wrap'), apDisc:$('ap-disc'), apBars:$('ap-bars'), apTitle:$('ap-title'), apProgress:$('ap-progress'),
+  rotWarn:$('rot-warn'),
+  emergency:$('emergency-overlay'), widgets:$('widgets-container'),
+  card:$('card-player'),
+  progWrap:$('prog-wrap'), progBar:$('prog-bar'),
+  ctrl:$('ctrl'), banner:$('update-banner'), toast:$('toast'),
+  // botões de controle removidos
+};
+
+// ── Tela Cheia ───────────────────────────────────────────────────
+function isFS() { return !!(document.fullscreenElement||document.webkitFullscreenElement); }
+function toggleFS() {
+  if (isFS()) {
+    (document.exitFullscreen||document.webkitExitFullscreen).call(document);
+  } else {
+    const d = document.documentElement;
+    (d.requestFullscreen||d.webkitRequestFullscreen).call(d);
+  }
+}
+
+// Mostrar controles ao mover mouse
+let ctrlT = null;
+// ── Ocultar cursor ───────────────────────────────────────────────
+// CSS cursor:none funciona na maioria dos browsers.
+// Para TVs Samsung/Tizen que ignoram cursor:none, movemos o ponteiro
+// para fora da área visível via dispatchEvent após 1s de inatividade.
+(function hideCursor() {
+  var hideT = null;
+  function moveCursorOffscreen() {
+    try {
+      // Dispara um mousemove sintético para além do canto inferior direito
+      var evt = new MouseEvent('mousemove', {
+        bubbles: true, cancelable: true,
+        clientX: window.innerWidth + 100,
+        clientY: window.innerHeight + 100,
+        screenX: window.screen.width + 100,
+        screenY: window.screen.height + 100
+      });
+      document.dispatchEvent(evt);
+    } catch(e) {}
+  }
+  function scheduleHide() {
+    clearTimeout(hideT);
+    hideT = setTimeout(moveCursorOffscreen, 1000);
+  }
+  document.addEventListener('mousemove', scheduleHide);
+  document.addEventListener('mousedown', scheduleHide);
+  document.addEventListener('touchstart', scheduleHide);
+  scheduleHide(); // já esconde ao iniciar
+})();
+
+document.addEventListener('mousemove', ()=>{
+  el.ctrl.classList.add('show');
+  clearTimeout(ctrlT);
+  ctrlT = setTimeout(()=>el.ctrl.classList.remove('show'), 3000);
+});
+
+// Teclas
+document.addEventListener('keydown', e=>{
+  if (e.key==='f'||e.key==='F')     toggleFS();
+  if (e.key==='ArrowRight')          nextItem();
+  if (e.key==='ArrowLeft')           playItem(curIdx-1);
+  if (e.key==='m'||e.key==='M')     toggleMute();
+});
+
+// ── Volume ───────────────────────────────────────────────────────
+function setVol(v) {
+  curVol = Math.max(0,Math.min(100,v));
+  el.video.volume = curVol/100;
+  if (ytPlayer?.setVolume) ytPlayer.setVolume(curVol);
+  isMuted = curVol===0;
+  updVolBtn();
+}
+function toggleMute() {
+  if (isMuted) { el.video.muted=false; if(ytPlayer?.unMute) ytPlayer.unMute(); isMuted=false; setVol(curVol||80); }
+  else         { el.video.muted=true;  if(ytPlayer?.mute)   ytPlayer.mute();   isMuted=true;  updVolBtn(); }
+}
+function updVolBtn() { /* botão de volume removido */ }
+
+// ── UI Helpers ───────────────────────────────────────────────────
+function showOverlay(msg, mode='loading') {
+  el.overlay.classList.remove('hidden');
+  el.overlayMsg.textContent = msg;
+  el.spinner.style.display  = mode==='loading'?'block':'none';
+  el.setupForm.classList[mode==='setup'?'remove':'add']('hidden');
+  el.errorBtns.classList[mode==='error'?'remove':'add']('hidden');
+}
+function hideOverlay() { el.overlay.classList.add('hidden'); }
+
+let toastT = null;
+function toast(msg, ms=4000) {
+  el.toast.textContent=msg; el.toast.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>el.toast.classList.remove('show'),ms);
+}
+function flashBanner() { el.banner.classList.add('show'); setTimeout(()=>el.banner.classList.remove('show'),3000); }
+
+// ── Sirene ───────────────────────────────────────────────────────
+function startSiren() {
+  try {
+    if (sirenNode) return;
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    sirenNode = { osc: audioCtx.createOscillator(), gain: audioCtx.createGain(), interval: null };
+    sirenNode.osc.type = 'sawtooth';
+    sirenNode.osc.connect(sirenNode.gain);
+    sirenNode.gain.connect(audioCtx.destination);
+    sirenNode.gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+    sirenNode.osc.start();
+    // Oscilação 400→800 Hz em ciclos de 1s
+    let up = true;
+    sirenNode.interval = setInterval(()=>{
+      if (!sirenNode) return;
+      const now = audioCtx.currentTime;
+      sirenNode.osc.frequency.cancelScheduledValues(now);
+      sirenNode.osc.frequency.setValueAtTime(up?400:800, now);
+      sirenNode.osc.frequency.linearRampToValueAtTime(up?800:400, now+0.9);
+      up = !up;
+    }, 900);
+  } catch(e) { console.warn('Siren error:', e); }
+}
+
+function stopSiren() {
+  try {
+    if (!sirenNode) return;
+    clearInterval(sirenNode.interval);
+    sirenNode.gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    sirenNode.osc.stop();
+    audioCtx.close();
+    sirenNode = null; audioCtx = null;
+  } catch(e) {}
+}
+
+// ── Emergência ───────────────────────────────────────────────────
+function applyEmergency(em) {
+  const wasActive = emergency && emergency.active;
+  emergency = em;
+  if (em && em.active) {
+    stopTimers();
+    el.video.pause();
+    if (ytPlayer?.pauseVideo) ytPlayer.pauseVideo();
+    el.emergency.innerHTML = `<div id="em-icon">🚨</div><h1 style="color:${em.text_color||'#fff'}">${em.title||'AVISO IMPORTANTE'}</h1><p style="color:${em.text_color||'#fff'}">${em.message||''}</p>`;
+    el.emergency.style.background = em.bg_color||'#dc2626';
+    el.emergency.classList.add('show');
+    startSiren();
+  } else {
+    el.emergency.classList.remove('show');
+    stopSiren();
+    // Só retoma reprodução se estava em emergência antes (transição ativo→inativo)
+    // Nunca chamar playItem durante sincronizações de rotina
+    if (wasActive && isPlaying && playlist.length) playItem(curIdx);
+  }
+}
+
+// ── Cache de widgets ─────────────────────────────────────────────
+let weatherCache = {};
+let newsCache    = {};
+let wTimers      = {};
+
+// WMO codes
+const WMO = {
+  0:['☀️','Céu limpo'],1:['🌤','Limpo'],2:['⛅','Parcialmente nublado'],3:['☁️','Nublado'],
+  45:['🌫️','Neblina'],48:['🌫️','Neblina geada'],51:['🌦️','Garoa fraca'],53:['🌦️','Garoa'],
+  55:['🌧️','Garoa intensa'],61:['🌧️','Chuva fraca'],63:['🌧️','Chuva'],65:['🌧️','Chuva forte'],
+  71:['❄️','Neve fraca'],73:['❄️','Neve'],75:['❄️','Neve intensa'],
+  80:['🌦️','Pancadas fracas'],81:['🌧️','Pancadas'],82:['⛈️','Pancadas fortes'],
+  95:['⛈️','Tempestade'],96:['⛈️','Tempestade com granizo'],99:['⛈️','Tempestade intensa'],
+};
+
+const WSIZES = {
+  sm:{barH:36, clkT:'18px',clkD:'11px',wTmp:'22px',wIco:'26px',wInf:'11px',tick:'12px',txt:'14px',pad:'0 12px'},
+  md:{barH:48, clkT:'28px',clkD:'13px',wTmp:'32px',wIco:'36px',wInf:'12px',tick:'14px',txt:'18px',pad:'0 18px'},
+  lg:{barH:64, clkT:'42px',clkD:'16px',wTmp:'48px',wIco:'52px',wInf:'14px',tick:'18px',txt:'26px',pad:'0 24px'},
+  xl:{barH:88, clkT:'64px',clkD:'20px',wTmp:'70px',wIco:'72px',wInf:'18px',tick:'22px',txt:'38px',pad:'0 32px'},
+};
+function sz(w) { return WSIZES[w.config?.widget_size||'md']; }
+
+async function fetchWeather(w) {
+  const c=w.config||{}, unit=c.unit||'C';
+  let lat=c._lat, lon=c._lon;
+  if (!lat||!lon) {
+    try {
+      const g=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(c.city||'')}&count=10&language=pt&format=json`);
+      const gj=await g.json();
+      let rs=gj.results||[];
+      const br=rs.filter(r=>r.country_code==='BR');
+      let loc=br[0]||rs[0];
+      if(c.state&&br.length>1){const st=c.state.toUpperCase();const bs=br.filter(r=>(r.admin1||'').toUpperCase().includes(st));if(bs.length)loc=bs[0];}
+      if(!loc)return null;
+      lat=loc.latitude;lon=loc.longitude;
+    }catch{return null;}
+  }
+  try {
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,apparent_temperature&temperature_unit=${unit==='F'?'fahrenheit':'celsius'}&wind_speed_unit=kmh&timezone=auto&forecast_days=1`);
+    const j=await r.json(); const cur=j.current; if(!cur)return null;
+    const [icon,desc]=WMO[cur.weather_code]||['🌡️','—'];
+    return {temp:Math.round(cur.temperature_2m),feels:Math.round(cur.apparent_temperature),humidity:cur.relative_humidity_2m,wind:Math.round(cur.wind_speed_10m),unit,icon,desc,city:[c.city,c.state].filter(Boolean).join(', ')||'Local'};
+  }catch{return null;}
+}
+
+async function fetchNews(w) {
+  const url=w.config?.rss_url;
+  if(!url)return{items:[],status:'no-url'};
+  try{
+    const r=await fetch(`/api/proxy/news?url=${encodeURIComponent(url)}&_=${Date.now()}`);
+    const j=await r.json();
+    if(!r.ok||j.error)return{items:[],status:'error',error:j.error,hint:j.hint};
+    if(!j.items?.length)return{items:[],status:'empty',hint:j.hint};
+    return{items:j.items,status:'ok'};
+  }catch(e){return{items:[],status:'error',error:e.message};}
+}
+
+// ── Drag ─────────────────────────────────────────────────────────
+const wPos = {}; // { id: {x:%, y:%} }
+
+function makeDraggable(el2, wid) {
+  let dragging = false, startCX, startCY, startXpct, startYpct;
+
+  function stageSize() {
+    const st = document.getElementById('stage');
+    return st ? { w: st.offsetWidth, h: st.offsetHeight }
+              : { w: window.innerWidth, h: window.innerHeight };
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function start(cx, cy) {
+    dragging = true;
+    el2.classList.add('dragging');
+    // Posição atual em %
+    startXpct = parseFloat(el2.style.left) || 85;
+    startYpct = parseFloat(el2.style.top)  || 10;
+    startCX = cx; startCY = cy;
+  }
+
+  function move(cx, cy) {
+    if (!dragging) return;
+    const { w, h } = stageSize();
+    const dx = (cx - startCX) / w * 100;
+    const dy = (cy - startCY) / h * 100;
+    const nx = clamp(startXpct + dx, 2, 98);
+    const ny = clamp(startYpct + dy, 2, 98);
+    el2.style.left = nx + '%';
+    el2.style.top  = ny + '%';
+    wPos[wid] = { x: nx, y: ny };
+  }
+
+  function end() { dragging = false; el2.classList.remove('dragging'); }
+
+  el2.addEventListener('mousedown',  e => { e.preventDefault(); start(e.clientX, e.clientY); });
+  document.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+  document.addEventListener('mouseup',   end);
+  el2.addEventListener('touchstart', e => start(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  el2.addEventListener('touchmove',  e => { e.preventDefault(); move(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  el2.addEventListener('touchend',   end);
+}
+
+// ── Construir widget ─────────────────────────────────────────────
+function buildWidgetEl(w) {
+  const c   = (typeof w.config === 'object' && w.config !== null) ? w.config : {};
+  const s   = sz(w);
+  const pos = w.position || 'corner-tr';
+  const div = document.createElement('div');
+  div.dataset.wid = w.id;
+
+  const isBar    = pos==='bottom' || pos==='top';
+  const isSide   = pos==='side-left' || pos==='side-right';
+  const isCorner = pos==='corner-tr' || pos==='corner-br';
+  const isFree   = pos==='free';
+  const isFull   = pos==='fullscreen';
+
+  // Aplicar classe e estilo de posição
+  if (isBar) {
+    div.className = `w-bar pos-${pos}`;
+    div.style.height = s.barH + 'px';
+  } else if (isSide) {
+    div.className = `w-side pos-${pos}`;
+    div.style.width = s.barH + 'px'; // espessura da barra lateral
+  } else if (isCorner) {
+    div.className = `w-corner pos-${pos}`;
+  } else if (isFree) {
+    div.className = 'w-free';
+    const saved = wPos[w.id];
+    const xp = saved ? saved.x : (c._x != null ? c._x : 85);
+    const yp = saved ? saved.y : (c._y != null ? c._y : 10);
+    div.style.left = xp + '%';
+    div.style.top  = yp + '%';
+    wPos[w.id] = { x: xp, y: yp };
+    makeDraggable(div, w.id);
+  } else if (isFull) {
+    div.className = 'w-full';
+  }
+
+  // ── Relógio ──────────────────────────────────────────────────
+  if (w.type === 'clock') {
+    const ci = `wc-${w.id}`;
+    const showDate = c.showDate !== false;
+    const di = showDate ? `wd-${w.id}` : null;
+    const fmtT = d => {
+      if (c.format==='12h') { const h=d.getHours()%12||12; return `${h}:${String(d.getMinutes()).padStart(2,'0')} ${d.getHours()<12?'AM':'PM'}`; }
+      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    };
+    const fmtD = d => d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+    const now  = new Date();
+    if (isBar) {
+      div.innerHTML = `<div style="padding:${s.pad};display:flex;align-items:center;gap:14px;height:100%">
+        <div id="${ci}" style="font-size:${s.clkT};font-weight:700;color:#fff;white-space:nowrap">${fmtT(now)}</div>
+        ${di?`<div id="${di}" style="font-size:${s.clkD};color:rgba(255,255,255,.65);text-transform:capitalize">${fmtD(now)}</div>`:''}
+      </div>`;
+    } else {
+      div.innerHTML = `
+        <div id="${ci}" style="font-size:${s.clkT};font-weight:700;color:#fff;text-align:center;white-space:nowrap">${fmtT(now)}</div>
+        ${di?`<div id="${di}" style="font-size:${s.clkD};color:rgba(255,255,255,.6);margin-top:4px;text-align:center;text-transform:capitalize">${fmtD(now)}</div>`:''}
+      `;
+    }
+    clearInterval(wTimers[ci]);
+    wTimers[ci] = setInterval(()=>{
+      const te=document.getElementById(ci); if(!te){clearInterval(wTimers[ci]);return;}
+      const n=new Date(); te.textContent=fmtT(n);
+      const de=di?document.getElementById(di):null; if(de)de.textContent=fmtD(n);
+    }, 1000);
+    return div;
+  }
+
+  // ── Clima ────────────────────────────────────────────────────
+  if (w.type === 'weather') {
+    const wd = weatherCache[w.id];
+    if (!wd) {
+      div.innerHTML = `<div style="padding:${s.pad};color:rgba(255,255,255,.45);font-size:${s.wInf}">⏳ Carregando clima...</div>`;
+      return div;
+    }
+    if (isBar) {
+      div.innerHTML = `<div style="display:flex;align-items:center;gap:12px;padding:${s.pad};height:100%">
+        <span style="font-size:${s.wIco}">${wd.icon}</span>
+        <div>
+          <div style="font-size:${s.wTmp};font-weight:700;color:#fff;line-height:1">${wd.temp}°${wd.unit}</div>
+          <div style="font-size:${s.wInf};color:rgba(255,255,255,.65);margin-top:2px">${wd.city} · ${wd.desc} · 💧${wd.humidity}% · 💨${wd.wind}km/h</div>
+        </div>
+      </div>`;
+    } else {
+      div.innerHTML = `
+        <div style="font-size:${s.wIco};text-align:center">${wd.icon}</div>
+        <div style="font-size:${s.wTmp};font-weight:700;color:#fff;text-align:center;margin-top:4px">${wd.temp}°${wd.unit}</div>
+        <div style="font-size:${s.wInf};color:rgba(255,255,255,.6);text-align:center;margin-top:3px">${wd.desc}</div>
+        <div style="font-size:${s.wInf};color:rgba(255,255,255,.5);text-align:center;margin-top:2px">${wd.city}</div>
+        <div style="font-size:${s.wInf};color:rgba(255,255,255,.45);text-align:center;margin-top:2px">💧${wd.humidity}% · 💨${wd.wind}km/h</div>
+      `;
+    }
+    return div;
+  }
+
+  // ── Notícias (ticker) ────────────────────────────────────────
+  if (w.type === 'news') {
+    const cached = newsCache[w.id] || {items:[],status:'loading'};
+    const items  = cached.items || [];
+    if (!items.length) {
+      const msgs = {loading:'⏳ Carregando notícias...',error:'⚠️ Erro ao carregar notícias',empty:'⚠️ Nenhuma notícia encontrada','no-url':'⚠️ Configure a URL do feed'};
+      div.innerHTML = `<div style="padding:${s.pad};color:rgba(255,255,255,.55);font-size:${s.tick};font-style:italic">${msgs[cached.status]||msgs.loading}</div>`;
+      return div;
+    }
+    const limited = items.slice(0, c.count || items.length);
+    const sep = '<span style="margin:0 28px;opacity:.35">◆</span>';
+    const tickerHTML = [...limited,...limited].map(n=>`<span>${n}</span>${sep}`).join('');
+    const spd = Math.max(20, c.speed || 60);
+
+    if (isSide) {
+      // ── Barra lateral: ticker corre verticalmente (de baixo para cima) ──
+      // Estratégia: inner wrapper rotacionado -90°/+90° com width = altura da tela.
+      // O ticker dentro dele rola horizontalmente, que após rotação aparece como rolar vertical.
+      const inner = document.createElement('div');
+      inner.className = 'w-side-inner';
+      // Largura = altura da tela para o ticker ter espaço suficiente
+      const screenH = window.innerHeight;
+      inner.style.cssText = `width:${screenH}px;height:${s.barH}px;overflow:hidden;display:flex;align-items:center;`;
+      const track = document.createElement('div');
+      track.style.cssText = `white-space:nowrap;display:inline-block;color:#fff;font-size:${s.tick};padding:0 8px;`;
+      track.innerHTML = tickerHTML;
+      inner.appendChild(track);
+      div.appendChild(inner);
+      requestAnimationFrame(()=>{
+        const half = track.scrollWidth / 2;
+        const dur  = Math.max(8, half / spd);
+        track.style.animation = `ticker-scroll ${dur}s linear infinite`;
+      });
+    } else {
+      // ── Barra normal: ticker horizontal ──
+      const ov = document.createElement('div');
+      ov.style.cssText = 'overflow:hidden;width:100%;height:100%;display:flex;align-items:center;';
+      const track = document.createElement('div');
+      track.style.cssText = `white-space:nowrap;display:inline-block;color:#fff;font-size:${s.tick};padding:0 8px;`;
+      track.innerHTML = tickerHTML;
+      ov.appendChild(track); div.appendChild(ov);
+      requestAnimationFrame(()=>{
+        const half = track.scrollWidth / 2;
+        const dur  = Math.max(8, half / spd);
+        track.style.animation = `ticker-scroll ${dur}s linear infinite`;
+      });
+    }
+    return div;
+  }
+
+  // ── Texto ────────────────────────────────────────────────────
+  if (w.type === 'text') {
+    const txt = c.text || '';
+    div.innerHTML = `<div style="font-size:${s.txt};color:${c.color||'#fff'};padding:${isBar?s.pad:'6px 10px'};text-align:center;line-height:1.3">${txt||'Texto não configurado'}</div>`;
+    return div;
+  }
+
+  // ── Contagem Regressiva ──────────────────────────────────────
+  if (w.type === 'countdown') {
+    const cid    = `cd-${w.id}`;
+    const label  = c.label || 'Evento';
+    // Suporta datetime-local (2025-12-31T23:59) e date (2025-12-31)
+    const target = c.target_date ? new Date(c.target_date) : null;
+    const validTarget = target && !isNaN(target.getTime());
+    div.innerHTML = `
+      <div style="text-align:center;padding:${isBar?s.pad:'6px 10px'}">
+        <div style="font-size:${s.clkD};color:rgba(255,255,255,.65);margin-bottom:2px">${label}</div>
+        <div id="${cid}" style="font-size:${isBar?s.clkT:s.wTmp};font-weight:700;color:${c.color||'#fff'};font-variant-numeric:tabular-nums;letter-spacing:1px">
+          ${validTarget ? '--:--:--' : '⚠️ Data inválida'}
+        </div>
+      </div>`;
+    if (!validTarget) return div;
+    clearInterval(wTimers[cid]);
+    wTimers[cid] = setInterval(()=>{
+      const te = document.getElementById(cid); if (!te) { clearInterval(wTimers[cid]); return; }
+      const diff = target - new Date();
+      if (diff <= 0) { te.textContent = '🎉 Chegou!'; clearInterval(wTimers[cid]); return; }
+      const dd = Math.floor(diff/86400000), hh = Math.floor((diff%86400000)/3600000),
+            mm = Math.floor((diff%3600000)/60000), ss = Math.floor((diff%60000)/1000);
+      te.textContent = dd > 0
+        ? `${dd}d ${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`
+        : `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    }, 1000);
+    return div;
+  }
+
+  // ── Cardápio ─────────────────────────────────────────────────
+  if (w.type === 'menu') {
+    const itens = Array.isArray(c.items) ? c.items : [];
+    const title = c.title || 'Cardápio';
+    const bg    = c.bg_color || 'rgba(0,0,0,.85)';
+    const rows  = itens.length
+      ? itens.map(it=>`<div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:6px;align-items:baseline">
+          <span style="font-size:${s.wInf};color:rgba(255,255,255,.92)">${it.name||''}</span>
+          <span style="font-size:${s.wInf};color:#4ade80;font-weight:700;white-space:nowrap">${it.price||''}</span>
+        </div>`).join('')
+      : `<p style="font-size:${s.wInf};color:rgba(255,255,255,.4)">Nenhum item</p>`;
+    if (isBar) {
+      div.innerHTML = `<div style="padding:${s.pad};display:flex;align-items:center;gap:18px;height:100%">
+        <span style="font-size:${s.tick};font-weight:700;color:#fff;white-space:nowrap">${title}</span>
+        <div style="display:flex;gap:24px;flex-wrap:nowrap;overflow:hidden">${itens.map(it=>`<span style="font-size:${s.wInf};color:rgba(255,255,255,.9);white-space:nowrap">${it.name||''} <span style="color:#4ade80;font-weight:700">${it.price||''}</span></span>`).join('')}</div>
+      </div>`;
+    } else {
+      div.innerHTML = `<div style="padding:14px 18px;background:${bg};border-radius:10px;min-width:200px;max-width:320px">
+        <div style="font-size:${s.txt};font-weight:700;color:#fff;margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,.18);padding-bottom:6px">${title}</div>
+        ${rows}
+      </div>`;
+    }
+    return div;
+  }
+
+  // ── Logo/Patrocinador ────────────────────────────────────────
+  if (w.type === 'logo') {
+    const url     = c.url || '';
+    const width   = c.width || 120;
+    const opacity = c.opacity != null ? c.opacity : 1;
+    const bg      = c.transparent ? 'transparent' : (c.bg_color || 'transparent');
+    const pad     = c.no_padding ? '0' : '8px';
+    if (!url) {
+      div.innerHTML = `<div style="padding:8px;color:rgba(255,255,255,.4);font-size:11px">🖼 Logo não configurada</div>`;
+    } else {
+      div.innerHTML = `<div style="background:${bg};padding:${pad};border-radius:8px;display:inline-flex;align-items:center;justify-content:center">
+        <img src="${url}" style="width:${width}px;max-height:${isBar?s.barH-12:100}px;object-fit:contain;opacity:${opacity};display:block" alt="Logo" onerror="this.style.display='none'"/>
+      </div>`;
+    }
+    return div;
+  }
+
+  // ── QR Code ──────────────────────────────────────────────────
+  if (w.type === 'qrcode') {
+    const url  = c.url || '';
+    const size = (isCorner||isFree) ? 140 : 100;
+    if (!url) {
+      div.innerHTML = `<div style="padding:8px;color:rgba(255,255,255,.4);font-size:11px">📱 URL não configurada</div>`;
+      return div;
+    }
+    const qid = `qr-${w.id}`;
+    div.innerHTML = `<div style="background:#fff;padding:8px;border-radius:8px;display:inline-flex;flex-direction:column;align-items:center;gap:4px">
+      <img id="${qid}" src="" width="${size}" height="${size}" style="display:block" alt="QR"/>
+      ${c.qr_label?`<span style="font-size:11px;color:#333;max-width:${size}px;text-align:center;line-height:1.2">${c.qr_label}</span>`:''}
+    </div>`;
+    requestAnimationFrame(()=>{
+      const img = document.getElementById(qid); if(!img) return;
+      img.src = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}&format=png`;
+    });
+    return div;
+  }
+
+  // ── iFrame ───────────────────────────────────────────────────
+  if (w.type === 'iframe') {
+    const url = c.url || '';
+    if (!url) {
+      div.innerHTML = `<div style="padding:8px;color:rgba(255,255,255,.4);font-size:11px">🖥 URL não configurada</div>`;
+      return div;
+    }
+    if (isFull) {
+      div.innerHTML = `<iframe src="${url}" allow="autoplay;fullscreen" allowfullscreen style="width:100%;height:100%;border:none;display:block"></iframe>`;
+    } else {
+      const h = isBar ? s.barH : 200;
+      div.innerHTML = `<div style="width:${isBar?'100%':'320px'};height:${h}px;overflow:hidden;border-radius:${isBar?0:10}px">
+        <iframe src="${url}" allow="autoplay" style="width:100%;height:100%;border:none;display:block;pointer-events:none" scrolling="no"></iframe>
+      </div>`;
+    }
+    return div;
+  }
+
+  return div;
+}
+
+function applyWidgetRotation(div, rotation) {
+  var rot = Number(rotation) || 0;
+  if (rot === 0) return;
+  // Barras laterais ja tem rotacao via CSS (.w-side-inner) — nao aplicar transform extra
+  if (div.classList.contains('w-side')) return;
+  var W = window.innerWidth, H = window.innerHeight;
+  var t = 'rotate(' + rot + 'deg)';
+  var isBar = div.classList.contains('w-bar');
+
+  // Envolve o conteúdo num inner-wrap com overflow:hidden
+  // assim o transform fica no div externo (sem overflow:hidden)
+  // e o clipping fica no inner-wrap (sem transform)
+  var inner = document.createElement('div');
+  inner.style.cssText = 'width:100%;height:100%;overflow:hidden;position:relative;';
+  while (div.firstChild) inner.appendChild(div.firstChild);
+  div.appendChild(inner);
+  div.style.overflow = 'visible';
+
+  if (rot === 90 || rot === 270) {
+    if (isBar) {
+      var barH = parseInt(div.style.height) || 48;
+      div.style.left   = Math.round((W - barH) / 2) + 'px';
+      div.style.top    = Math.round((H - W) / 2) + 'px';
+      div.style.right  = '';
+      div.style.bottom = '';
+      div.style.width  = H + 'px';
+      // mantém a altura original da barra
+      inner.style.width  = H + 'px';
+      inner.style.height = barH + 'px';
+    } else {
+      div.style.left  = Math.round((W - H) / 2) + 'px';
+      div.style.top   = Math.round((H - W) / 2) + 'px';
+      div.style.right = '';
+      div.style.width = H + 'px';
+      div.style.height = W + 'px';
+    }
+  }
+
+  div.style.webkitTransformOrigin = 'center center';
+  div.style.transformOrigin       = 'center center';
+  div.style.webkitTransform       = t;
+  div.style.MozTransform          = t;
+  div.style.msTransform           = t;
+  div.style.transform             = t;
+}
+
+// ── Renderizar todos os widgets ──────────────────────────────────
+async function renderWidgets(wList) {
+  // Limpar timers antigos
+  Object.keys(wTimers).forEach(k=>{ clearInterval(wTimers[k]); delete wTimers[k]; });
+  el.widgets.innerHTML = '';
+
+  // Garantir que config é sempre objeto
+  wList = wList.map(w => ({
+    ...w,
+    config: (typeof w.config === 'object' && w.config !== null) ? w.config
+          : (typeof w.config === 'string') ? (() => { try { const p=JSON.parse(w.config); return typeof p==='object'?p:{}; } catch{return {};} })()
+          : {}
+  }));
+
+  // Filtrar por TV: tv_ids vazio = aparece em todas; tv_ids preenchido = só nas TVs listadas
+  const myTvId = cfg.tvId || '';
+  wList = wList.filter(w => {
+    if (!w.tv_ids || w.tv_ids === '') return true; // sem restrição
+    const ids = w.tv_ids.split(',').map(s=>s.trim()).filter(Boolean);
+    return ids.length === 0 || ids.includes(myTvId);
+  });
+
+  // Pré-carregar dados assíncronos
+  await Promise.all(wList.filter(w=>w.active).map(async w => {
+    if (w.type==='weather' && (w.config.city || w.config._lat)) {
+      weatherCache[w.id] = await fetchWeather(w);
+    }
+    if (w.type==='news' && w.config.rss_url) {
+      newsCache[w.id] = await fetchNews(w);
+    }
+  }));
+
+  // Construir e inserir elementos
+  for (const w of wList) {
+    if (!w.active) continue;
+    const div = buildWidgetEl(w);
+    applyWidgetRotation(div, w.rotation);
+    el.widgets.appendChild(div);
+  }
+
+  // Ajustar progresso quando há barra bottom
+  const botW = wList.find(w => w.active && w.position==='bottom');
+  el.progWrap.style.bottom = botW ? (WSIZES[botW.config?.widget_size||'md']?.barH||48)+'px' : '0';
+}
+
+// Atualizar clima a cada 30 min
+function startWeatherRefresh() {
+  clearInterval(wTimer);
+  wTimer = setInterval(async()=>{
+    for (const w of widgets) {
+      if (!w.active || w.type!=='weather') continue;
+      if (!w.config?.city && !w.config?._lat) continue;
+      const fresh = await fetchWeather(w);
+      if (!fresh) continue;
+      weatherCache[w.id] = fresh;
+      const el2 = document.querySelector(`[data-wid="${w.id}"]`);
+      if (el2) { const tmp=buildWidgetEl(w); el2.innerHTML=tmp.innerHTML; }
+    }
+  }, 30*60*1000);
+}
+
+// ── Transições ───────────────────────────────────────────────────
+function applyTransition(mediaEl) {
+  const t = tvConf.transition || 'fade';
+  mediaEl.classList.add('active');
+  // Animação de transição vai no WRAPPER, não no elemento de mídia
+  // assim não conflita com o transform de rotação do elemento
+  const wrap = el.rotWrap;
+  wrap.classList.remove('t-right','t-left','t-zoom');
+  if (t==='right') { wrap.classList.add('t-right'); setTimeout(()=>wrap.classList.remove('t-right'),600); }
+  else if (t==='left')  { wrap.classList.add('t-left');  setTimeout(()=>wrap.classList.remove('t-left'),600); }
+  else if (t==='zoom')  { wrap.classList.add('t-zoom');  setTimeout(()=>wrap.classList.remove('t-zoom'),600); }
+}
+
+// ── Reprodução ───────────────────────────────────────────────────
+function stopTimers() {
+  clearTimeout(imgTimer); clearInterval(imgProgT);
+  el.progBar.style.width='0%'; el.progWrap.style.display='none';
+}
+
+// ── Patrocinadores (grupos por posição) ──────────────────────────
+const spState = {}; // { [groupId]: { idx, timer } }
+
+function clearSponsors() {
+  // Parar todos os timers e remover overlays
+  Object.values(spState).forEach(s => clearInterval(s.timer));
+  Object.keys(spState).forEach(k => delete spState[k]);
+  document.querySelectorAll('.sp-group').forEach(el => el.remove());
+}
+
+function initSponsors(groups) {
+  clearSponsors();
+  if (!groups || !groups.length) return;
+
+  const container = document.getElementById('media-container') || document.body;
+
+  groups.filter(g => g.active && g.logos && g.logos.length).forEach(group => {
+    const cfg      = group.config || {};
+    const pos      = group.position || 'bl';
+    const w        = cfg.width    || 160;
+    const h        = cfg.height   || 80;
+    const opacity  = cfg.opacity  != null ? cfg.opacity : 0.9;
+    const bg       = cfg.bg       || 'rgba(0,0,0,0.45)';
+    const radius   = cfg.radius   != null ? cfg.radius : 8;
+    const interval = (cfg.interval || 5) * 1000;
+    const rot      = Number(group.rotation || 0);
+
+    const div = document.createElement('div');
+    div.className = `sp-group sp-pos-${pos}`;
+    div.dataset.gid = group.id;
+
+    const isBar = pos === 'bc' || pos === 'tc';
+    if (isBar) {
+      div.style.cssText = `height:${h+16}px;background:${bg};border-radius:0;padding:8px 0;`;
+    } else if (pos === 'center') {
+      div.style.cssText = `width:${w}px;height:${h}px;background:${bg};border-radius:${radius}px;padding:6px;`;
+    } else {
+      div.style.cssText = `width:${w}px;height:${h}px;background:${bg};border-radius:${radius}px;padding:6px;`;
+    }
+
+    // Criar imagens
+    group.logos.forEach((logo, i) => {
+      const img = document.createElement('img');
+      img.src   = logo.url;
+      img.alt   = logo.name || '';
+      // Aplicar rotação em cada imagem se configurado
+      if (rot !== 0) {
+        img.style.transform = `rotate(${rot}deg)`;
+        img.style.transformOrigin = 'center center';
+        // Para rotações 90/270 precisamos ajustar dimensões
+        if (rot === 90 || rot === 270) {
+          img.style.width  = 'calc(100% - 12px)';
+          img.style.maxWidth = h + 'px';
+          img.style.maxHeight = w + 'px';
+        }
+      }
+      img.style.opacity = '0';
+      div.appendChild(img);
+    });
+
+    container.appendChild(div);
+
+    // Iniciar slideshow
+    const state = { idx: 0, timer: null };
+    spState[group.id] = state;
+
+    // Mostrar primeira imagem
+    showGroupLogo(div, 0, opacity);
+
+    if (group.logos.length > 1) {
+      state.timer = setInterval(() => {
+        state.idx = (state.idx + 1) % group.logos.length;
+        showGroupLogo(div, state.idx, opacity);
+      }, interval);
+    }
+  });
+}
+
+function showGroupLogo(div, idx, opacity) {
+  const imgs = div.querySelectorAll('img');
+  imgs.forEach((img, i) => {
+    img.style.opacity = i === idx ? String(opacity) : '0';
+  });
+}
+
+function buildShuffleOrder(len) {
+  const arr = Array.from({length:len}, (_,i)=>i);
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  shuffleOrder = arr;
+}
+
+function hideAllMedia() {
+  el.video.pause(); el.video.classList.remove('active'); el.video.style.display='none';
+  el.video.onloadeddata = null;
+  stopCanvas();
+  el.image.classList.remove('active'); el.image.style.display='none';
+  el.ytWrap.style.display='none';
+  if (ytPlayer?.pauseVideo) ytPlayer.pauseVideo();
+  el.pdfPlayer.style.display='none'; el.pdfPlayer.src='';
+  el.audioSrc.pause(); el.audioSrc.src=''; el.audioWrap.classList.remove('active'); el.apDisc.classList.remove('playing'); el.apBars.classList.remove('playing');
+  el.rotWarn.style.display = 'none';
+  // Resetar rotação inline de cada elemento
+  _resetMediaEl(el.video);
+  _resetMediaEl(el.image);
+  _resetMediaEl(el.pdfPlayer);
+  _resetMediaEl(el.ytWrap);
+  // Limpar animações do wrapper
+  el.rotWrap.classList.remove('t-right','t-left','t-zoom');
+  // Ocultar card especial e limpar timers de card
+  el.card.classList.remove('active'); el.card.style.display='none';
+  Object.keys(cardTimers).forEach(k=>{ clearInterval(cardTimers[k]); delete cardTimers[k]; });
+}
+function playItem(idx) {
+  if (!playlist.length || emergency.active) return;
+  if (shuffleMode) {
+    // Em modo aleatório, idx é posição na shuffleOrder
+    const pos = ((idx % shuffleOrder.length) + shuffleOrder.length) % shuffleOrder.length;
+    curIdx = shuffleOrder[pos];
+    // Guarda posição lógica no shuffleOrder para nextItem funcionar
+    playItem._shufflePos = pos;
+  } else {
+    curIdx = ((idx%playlist.length)+playlist.length)%playlist.length;
+  }
+  const item = playlist[curIdx];
+  stopTimers(); sendHeartbeat(item.name);
+  if      (item.media_type==='audio')          playAudio(item);
+  else if (item.media_type==='youtube')       playYT(item);
+  else if (item.media_type==='image')         playImg(item);
+  else if (item.media_type==='pdf')           playPdf(item);
+  else if (item.media_type==='clock_card')    playCard(item);
+  else if (item.media_type==='weather_card')  playCard(item);
+  else if (item.media_type==='weather_clock') playCard(item);
+  else if (item.media_type==='slide')         playCard(item);
+  else                                         playVid(item);
+}
+function nextItem() {
+  if (shuffleMode) {
+    const nextPos = ((playItem._shufflePos||0) + 1);
+    if (nextPos >= shuffleOrder.length) { buildShuffleOrder(playlist.length); }
+    playItem(nextPos % shuffleOrder.length);
+  } else {
+    playItem(curIdx+1);
+  }
+}
+
+// ── Cards especiais ───────────────────────────────────────────────
+let cardTimers = {};
+
+const WMO_ICONS = {
+  0:['☀️','Céu limpo'],1:['🌤','Parcialmente limpo'],2:['⛅','Parcialmente nublado'],3:['☁️','Nublado'],
+  45:['🌫️','Neblina'],48:['🌫️','Neblina geada'],51:['🌦️','Garoa fraca'],53:['🌦️','Garoa'],55:['🌧️','Garoa intensa'],
+  61:['🌧️','Chuva fraca'],63:['🌧️','Chuva'],65:['🌧️','Chuva forte'],
+  71:['❄️','Neve fraca'],73:['❄️','Neve'],75:['❄️','Neve forte'],
+  80:['🌦️','Pancadas fracas'],81:['🌧️','Pancadas'],82:['⛈️','Pancadas fortes'],
+  95:['⛈️','Tempestade'],96:['⛈️','Tempestade c/ granizo'],99:['⛈️','Tempestade intensa'],
+};
+
+async function fetchCardWeather(c) {
+  const unit = c.unit || 'C';
+  let lat = c._lat, lon = c._lon;
+  if (!lat||!lon) {
+    try {
+      const g = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(c.city||'')}&count=5&language=pt`);
+      const gj = await g.json(); const loc = (gj.results||[])[0];
+      if (!loc) return null;
+      lat=loc.latitude; lon=loc.longitude;
+    } catch { return null; }
+  }
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,apparent_temperature&temperature_unit=${unit==='F'?'fahrenheit':'celsius'}&wind_speed_unit=kmh&timezone=auto&forecast_days=1`);
+    const j = await r.json(); const cur = j.current; if(!cur)return null;
+    const [icon,desc] = WMO_ICONS[cur.weather_code]||['🌡️','—'];
+    return {temp:Math.round(cur.temperature_2m),feels:Math.round(cur.apparent_temperature),humidity:cur.relative_humidity_2m,wind:Math.round(cur.wind_speed_10m),unit,icon,desc,city:[c.city,c.state].filter(Boolean).join(', ')||'Local'};
+  } catch { return null; }
+}
+
+function playCard(item) {
+  hideAllMedia();
+  const c = item.config || {};
+  const dur = (item.display_duration || 15) * 1000;
+  const rot = Number(item.rotation) || 0;
+  // Usar dimensões do stage (correto em portrait)
+  const st = document.getElementById('stage');
+  const W  = st ? st.offsetWidth  : window.innerWidth;
+  const H  = st ? st.offsetHeight : window.innerHeight;
+
+  el.card.innerHTML = '';
+  el.card.style.display = 'block';
+
+  const bg    = c.bg_color   || (item.media_type==='clock_card'?'#0f172a':item.media_type==='weather_card'?'#0c4a6e':item.media_type==='weather_clock'?'#0f1e3a':'#1e1b4b');
+  const color = c.text_color || '#ffffff';
+
+  // Montar posição/dimensão já considerando a rotação
+  // (não usar inset quando vamos rotacionar — conflita com left/top explícitos)
+  if (rot === 90 || rot === 270) {
+    var ml = Math.round((W - H) / 2);
+    var mt = Math.round((H - W) / 2);
+    el.card.style.cssText = `position:absolute;left:${ml}px;top:${mt}px;width:${H}px;height:${W}px;z-index:500;background:${bg};display:flex;align-items:center;justify-content:center;overflow:hidden;opacity:0;transition:opacity .5s;-webkit-transform-origin:center center;transform-origin:center center;-webkit-transform:rotate(${rot}deg);transform:rotate(${rot}deg);`;
+  } else if (rot === 180) {
+    el.card.style.cssText = `position:absolute;inset:0;z-index:500;background:${bg};display:flex;align-items:center;justify-content:center;overflow:hidden;opacity:0;transition:opacity .5s;-webkit-transform-origin:center center;transform-origin:center center;-webkit-transform:rotate(180deg);transform:rotate(180deg);`;
+  } else {
+    el.card.style.cssText = `position:absolute;inset:0;z-index:500;background:${bg};display:flex;align-items:center;justify-content:center;overflow:hidden;opacity:0;transition:opacity .5s;`;
+  }
+
+  requestAnimationFrame(()=>{ el.card.style.opacity='1'; el.card.classList.add('active'); });
+
+  if      (item.media_type === 'clock_card')    buildClockCard(el.card, c, color);
+  else if (item.media_type === 'weather_card')  buildWeatherCard(el.card, c, color);
+  else if (item.media_type === 'weather_clock') buildWeatherClockCard(el.card, c, color);
+  else if (item.media_type === 'slide')         buildSlideCard(el.card, c, color);
+
+  applyTransition(el.card);
+
+  el.progWrap.style.display = 'block'; el.progBar.style.width='0%';
+  const t0 = Date.now();
+  imgProgT = setInterval(()=>{ el.progBar.style.width=Math.min(((Date.now()-t0)/dur)*100,100)+'%'; }, 100);
+  imgTimer = setTimeout(()=>{ stopTimers(); nextItem(); }, dur);
+}
+
+function buildClockCard(container, c, color) {
+  const showDate  = c.show_date !== false;
+  const label     = c.label || '';
+  const fmt24     = c.format !== '12h';
+  const gradient  = c.gradient || '';
+  const gradStyle = gradient ? `background:${gradient};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;` : `color:${color}`;
+
+  container.innerHTML = `<div class="card-clock" style="color:${color}">
+    ${label?`<div class="cc-label" style="color:${color}">${label}</div>`:''}
+    <div class="cc-time" id="cc-time" style="${gradStyle}">--:--</div>
+    ${showDate?`<div class="cc-date" id="cc-date" style="color:${color}"></div>`:''}
+  </div>`;
+
+  const fmtT = d => {
+    if (!fmt24) { const h=d.getHours()%12||12; return `${h}:${String(d.getMinutes()).padStart(2,'0')}<span style="font-size:.45em;opacity:.6;margin-left:8px">${d.getHours()<12?'AM':'PM'}</span>`; }
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+  const fmtD = d => d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+
+  const tick = () => {
+    const now = new Date();
+    const te = document.getElementById('cc-time'); if(te) te.innerHTML = fmtT(now);
+    const de = document.getElementById('cc-date'); if(de) de.textContent = fmtD(now);
+  };
+  tick();
+  const tid = setInterval(tick, 1000);
+  cardTimers['clock'] = tid;
+}
+
+async function buildWeatherCard(container, c, color) {
+  container.innerHTML = `<div class="card-weather" style="color:${color}"><div class="cw-icon">⏳</div><div class="cw-temp">...</div></div>`;
+  const wd = await fetchCardWeather(c);
+  if (!wd) { container.innerHTML = `<div style="color:${color};font-size:28px;text-align:center">⚠️<br>Não foi possível<br>carregar o clima</div>`; return; }
+  const gradient  = c.gradient || '';
+  const tempStyle = gradient ? `background:${gradient};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;` : `color:${color}`;
+  container.innerHTML = `<div class="card-weather" style="color:${color}">
+    <div class="cw-icon">${wd.icon}</div>
+    <div class="cw-temp" style="${tempStyle}">${wd.temp}°${wd.unit}</div>
+    <div class="cw-desc">${wd.desc}</div>
+    <div class="cw-city">${wd.city}</div>
+    <div class="cw-extra">
+      <span>💧 ${wd.humidity}%</span>
+      <span>💨 ${wd.wind} km/h</span>
+      <span>🌡 Sens. ${wd.feels}°</span>
+    </div>
+  </div>`;
+}
+
+async function buildWeatherClockCard(container, c, color) {
+  const layout  = c.layout || 'side';   // 'side' | 'stack'
+  const fmt24   = c.format !== '12h';
+  const showDate = c.show_date !== false;
+
+  // Renderizar skeleton imediatamente enquanto carrega clima
+  const stackClass = layout === 'stack' ? 'layout-stack' : '';
+  container.innerHTML = `<div class="card-wc ${stackClass}" style="color:${color};width:100%;height:100%">
+    <div class="wc-right" id="wc-clock-side">
+      <div class="wc-time" id="wc-time">--:--</div>
+      ${showDate ? `<div class="wc-date" id="wc-date"></div>` : ''}
+    </div>
+    <div class="wc-divider"></div>
+    <div class="wc-left" id="wc-weather-side">
+      <div class="wc-icon">⏳</div>
+      <div class="wc-temp" style="font-size:clamp(28px,5vw,64px);opacity:.5">Carregando...</div>
+    </div>
+  </div>`;
+
+  // Relógio — começa imediatamente
+  const fmtT = d => {
+    if (!fmt24) {
+      const h = d.getHours()%12||12;
+      return `${h}:${String(d.getMinutes()).padStart(2,'0')}<span style="font-size:.42em;opacity:.6;margin-left:6px">${d.getHours()<12?'AM':'PM'}</span>`;
+    }
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+  const fmtD = d => d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+
+  const tick = () => {
+    const now = new Date();
+    const te = document.getElementById('wc-time'); if(te) te.innerHTML = fmtT(now);
+    const de = document.getElementById('wc-date'); if(de) de.textContent = fmtD(now);
+  };
+  tick();
+  cardTimers['wc-clock'] = setInterval(tick, 1000);
+
+  // Clima — busca assíncrona
+  const wd = await fetchCardWeather(c);
+  const weatherSide = document.getElementById('wc-weather-side');
+  if (!weatherSide) return; // card já avançou
+
+  if (!wd) {
+    weatherSide.innerHTML = `<div class="wc-icon">⚠️</div><div style="font-size:clamp(13px,2vw,24px);opacity:.5;margin-top:8px">Clima indisponível</div>`;
+    return;
+  }
+
+  const gradient = c.gradient || '';
+  const tempStyle = gradient
+    ? `background:${gradient};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;`
+    : `color:${color}`;
+
+  weatherSide.innerHTML = `
+    <div class="wc-icon">${wd.icon}</div>
+    <div class="wc-temp" style="${tempStyle}">${wd.temp}°${wd.unit}</div>
+    <div class="wc-desc" style="color:${color}">${wd.desc}</div>
+    <div class="wc-city" style="color:${color}">${wd.city}</div>
+    <div class="wc-extra" style="color:${color}">
+      <span>💧 ${wd.humidity}%</span>
+      <span>💨 ${wd.wind} km/h</span>
+      <span>🌡 ${wd.feels}°</span>
+    </div>
+  `;
+
+  // Recarregar clima a cada 10 minutos enquanto o card está visível
+  cardTimers['wc-weather'] = setInterval(async () => {
+    const fresh = await fetchCardWeather(c);
+    const side = document.getElementById('wc-weather-side');
+    if (!side || !fresh) return;
+    side.querySelector('.wc-icon').textContent = fresh.icon;
+    side.querySelector('.wc-temp').textContent = `${fresh.temp}°${fresh.unit}`;
+    side.querySelector('.wc-desc').textContent = fresh.desc;
+  }, 10 * 60 * 1000);
+}
+
+function buildSlideCard(container, c, color) {
+  const layout = c.layout || 'center';
+  const img    = c.image_url || '';
+  const icon   = c.icon || '';
+
+  let imgHtml = '';
+  if (img) {
+    if (layout === 'bg') imgHtml = `<img src="${img}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;opacity:${c.img_opacity||0.4}"/>`;
+    else if (layout === 'right') imgHtml = `<img src="${img}" style="position:absolute;right:0;top:0;height:100%;width:45%;object-fit:cover;z-index:0;opacity:${c.img_opacity||1}"/>`;
+  }
+
+  const contentW = (img && layout==='right') ? 'max-width:52%' : 'max-width:900px';
+  const align    = layout === 'right' ? 'text-align:left;align-items:flex-start;padding-left:8vw;' : 'text-align:center;';
+
+  container.innerHTML = `
+    ${imgHtml}
+    <div style="position:relative;z-index:1;display:flex;flex-direction:column;${align}${contentW};color:${color}">
+      ${icon?`<div class="cs-icon">${icon}</div>`:''}
+      ${c.title?`<div class="cs-title">${c.title}</div>`:''}
+      ${c.subtitle?`<div class="cs-subtitle">${c.subtitle}</div>`:''}
+      ${c.body?`<div class="cs-body">${c.body}</div>`:''}
+    </div>
+  `;
+}
+
+// ── Rotação de mídia ─────────────────────────────────────────────────────────
+// Tizen 3.5: <video> e <iframe> são renderizados numa camada de hardware separada.
+// CSS transform é ignorado para o CONTEÚDO desses elementos.
+// Solução para vídeo local: canvas (HTML layer) — desenhamos frames rotacionados.
+// Solução para YouTube: não há — mostramos aviso.
+// Solução para imagem/PDF: CSS transform direto funciona.
+
+var canvasLoop = null;
+
+function _drawRotatedFrame(video, ctx, canvasW, canvasH, rot) {
+  var vw = video.videoWidth  || canvasW;
+  var vh = video.videoHeight || canvasH;
+  ctx.clearRect(0, 0, canvasW, canvasH);
+  ctx.save();
+  ctx.translate(canvasW / 2, canvasH / 2);
+  ctx.rotate(rot * Math.PI / 180);
+  // object-fit:contain equivalente — após rotação o espaço disponível inverte eixos
+  var cw = (rot === 90 || rot === 270) ? canvasH : canvasW;
+  var ch = (rot === 90 || rot === 270) ? canvasW : canvasH;
+  var scale = Math.min(cw / vw, ch / vh);
+  ctx.drawImage(video, -(vw * scale) / 2, -(vh * scale) / 2, vw * scale, vh * scale);
+  ctx.restore();
+}
+
+function startCanvasVideo(videoEl, rot) {
+  var canvasEl = el.canvas;
+
+  // Em modo portrait no Tizen, window.innerWidth/Height pode refletir o viewport
+  // CSS rotacionado — mas o canvas precisa das dimensões físicas da tela.
+  // screen.width/height sempre retorna as dimensões físicas reais.
+  var physW = window.screen ? window.screen.width  : window.innerWidth;
+  var physH = window.screen ? window.screen.height : window.innerHeight;
+  // Garante que physW >= physH (landscape física)
+  if (physW < physH) { var tmp = physW; physW = physH; physH = tmp; }
+
+  canvasEl.width  = physW;
+  canvasEl.height = physH;
+  var ctx = canvasEl.getContext('2d');
+  canvasEl.style.display  = 'block';
+  canvasEl.style.position = 'fixed';
+  canvasEl.style.top      = '0';
+  canvasEl.style.left     = '0';
+  canvasEl.style.width    = physW + 'px';
+  canvasEl.style.height   = physH + 'px';
+  canvasEl.style.zIndex   = '600'; // acima do stage mas abaixo de widgets/emergency
+  videoEl.style.display   = 'none'; // esconde <video>, usa só para decodificação
+
+  function loop() {
+    if (videoEl.paused || videoEl.ended) { canvasLoop = null; return; }
+    _drawRotatedFrame(videoEl, ctx, canvasEl.width, canvasEl.height, rot);
+    canvasLoop = (window.requestAnimationFrame || window.webkitRequestAnimationFrame)(loop);
+  }
+  canvasLoop = (window.requestAnimationFrame || window.webkitRequestAnimationFrame)(loop);
+}
+
+function stopCanvas() {
+  if (canvasLoop) {
+    (window.cancelAnimationFrame || window.webkitCancelAnimationFrame)(canvasLoop);
+    canvasLoop = null;
+  }
+  el.canvas.style.display  = 'none';
+  el.canvas.style.position = '';
+  el.canvas.style.top      = '';
+  el.canvas.style.left     = '';
+  el.canvas.style.width    = '';
+  el.canvas.style.height   = '';
+  el.canvas.style.zIndex   = '';
+  el.canvas.width = 1; el.canvas.height = 1; // libera memória GPU
+}
+
+function _applyRotEl(elem, rot, W, H) {
+  if (!elem) return;
+  if (rot === 0) {
+    elem.style.position = ''; elem.style.top = ''; elem.style.left = '';
+    elem.style.width = ''; elem.style.height = '';
+    elem.style.webkitTransformOrigin = 'center center';
+    elem.style.transformOrigin = 'center center';
+    elem.style.webkitTransform = 'none';
+    elem.style.MozTransform    = 'none';
+    elem.style.msTransform     = 'none';
+    elem.style.transform       = 'none';
+  } else if (rot === 90 || rot === 270) {
+    var ml = Math.round((W - H) / 2);
+    var mt = Math.round((H - W) / 2);
+    var t  = 'rotate(' + rot + 'deg)';
+    elem.style.position = 'absolute';
+    elem.style.width    = H + 'px'; elem.style.height = W + 'px';
+    elem.style.left     = ml + 'px'; elem.style.top   = mt + 'px';
+    elem.style.webkitTransformOrigin = 'center center';
+    elem.style.transformOrigin = 'center center';
+    elem.style.webkitTransform = t; elem.style.MozTransform = t;
+    elem.style.msTransform = t; elem.style.transform = t;
+  } else if (rot === 180) {
+    var t = 'rotate(180deg)';
+    elem.style.position = 'absolute'; elem.style.top = '0px'; elem.style.left = '0px';
+    elem.style.width = '100%'; elem.style.height = '100%';
+    elem.style.webkitTransformOrigin = 'center center';
+    elem.style.transformOrigin = 'center center';
+    elem.style.webkitTransform = t; elem.style.MozTransform = t;
+    elem.style.msTransform = t; elem.style.transform = t;
+  }
+}
+
+function applyMediaRotation(rotation, mediaEl) {
+  var rot = Number(rotation) || 0;
+  // Usar dimensões do #stage, não do viewport — no modo portrait o stage tem
+  // dimensões invertidas (100vh × 100vw), e os cálculos de reposicionamento
+  // precisam ser relativos ao espaço do stage, não da tela física.
+  var st = document.getElementById('stage');
+  var W  = st ? st.offsetWidth  : window.innerWidth;
+  var H  = st ? st.offsetHeight : window.innerHeight;
+  el.rotWrap.style.webkitTransform = 'none';
+  el.rotWrap.style.transform = 'none';
+  el.rotWrap.style.position = 'absolute';
+  el.rotWrap.style.top = '0'; el.rotWrap.style.left = '0';
+  el.rotWrap.style.width = '100%'; el.rotWrap.style.height = '100%';
+  _applyRotEl(mediaEl, rot, W, H);
+}
+
+function _resetMediaEl(elem) {
+  if (!elem) return;
+  elem.style.position = ''; elem.style.top = ''; elem.style.left = '';
+  elem.style.width = ''; elem.style.height = '';
+  elem.style.webkitTransform = 'none'; elem.style.MozTransform = 'none';
+  elem.style.msTransform = 'none'; elem.style.transform = 'none';
+}
+
+// ── Reprodução ─────────────────────────────────────────────────────
+
+// Retorna a rotação que o #stage tem pelo modo portrait (0, 90 ou 270)
+function stageRotation() {
+  if (document.body.classList.contains('portrait-left'))  return 270; // rotate(-90deg)
+  if (document.body.classList.contains('portrait-right')) return 90;
+  return 0;
+}
+
+function playVid(item) {
+  hideAllMedia();
+  var itemRot  = Number(item.rotation) || 0;
+  var stageRot = stageRotation();
+  var totalRot = (itemRot + stageRot) % 360;
+
+  el.video.volume = curVol / 100; el.video.muted = isMuted;
+  el.video.src = window.location.origin + item.url;
+
+  if (totalRot !== 0) {
+    // Canvas path: esconde <video> desde o início para não aparecer deformado
+    el.video.style.display = 'none';
+    el.video.onloadeddata = null;
+    el.video.oncanplay = null;
+
+    var canvasStarted = false;
+    function tryStartCanvas() {
+      if (canvasStarted) return;
+      canvasStarted = true;
+      el.video.onloadeddata = null;
+      el.video.oncanplay    = null;
+      startCanvasVideo(el.video, totalRot);
+    }
+
+    el.video.onloadeddata = tryStartCanvas;
+    el.video.oncanplay    = tryStartCanvas; // fallback para browsers que pulam loadeddata
+
+    el.video.play().catch(function(e) {
+      console.warn('playVid canvas play error:', e);
+      setTimeout(nextItem, 2000);
+    });
+
+    // Safety timeout: se 5s não disparou nenhum evento, avança
+    setTimeout(function() {
+      if (!canvasStarted) { console.warn('canvas timeout, skipping'); nextItem(); }
+    }, 5000);
+
+  } else {
+    el.video.style.display = 'block';
+    el.video.play().catch(function(){ setTimeout(nextItem, 2000); });
+    applyTransition(el.video);
+  }
+}
+
+function playImg(item) {
+  const img = new Image();
+  img.src = window.location.origin + item.url;
+  img.onload = function() {
+    hideAllMedia();
+    el.image.src = img.src; el.image.style.display = 'block';
+    applyMediaRotation(item.rotation, el.image);  // CSS transform funciona em <img>
+    applyTransition(el.image);
+    const dur = (item.display_duration || 10) * 1000, t0 = Date.now();
+    el.progWrap.style.display = 'block'; el.progBar.style.width = '0%';
+    imgProgT = setInterval(function(){ el.progBar.style.width = Math.min(((Date.now()-t0)/dur)*100,100)+'%'; }, 100);
+    imgTimer = setTimeout(function(){ stopTimers(); nextItem(); }, dur);
+  };
+  img.onerror = function(){ setTimeout(nextItem, 2000); };
+}
+
+// ── YouTube: proxy via yt-dlp (sem DASH, sem restrição embed) ────
+function playAudio(item) {
+  hideAllMedia();
+  const url = window.location.origin + item.url;
+  el.audioSrc.src = url;
+  el.audioSrc.volume = isMuted ? 0 : curVol / 100;
+  el.audioSrc.muted  = isMuted;
+  el.audioWrap.classList.add('active');
+  el.apTitle.textContent = item.original_name || item.name || '♪';
+
+  // Barra de progresso
+  clearInterval(el.audioSrc._progTimer);
+  el.apProgress.style.width = '0%';
+  el.audioSrc._progTimer = setInterval(() => {
+    if (el.audioSrc.duration) {
+      el.apProgress.style.width = (el.audioSrc.currentTime / el.audioSrc.duration * 100) + '%';
+    }
+  }, 500);
+
+  el.audioSrc.play().then(() => {
+    el.apDisc.classList.add('playing');
+    el.apBars.classList.add('playing');
+  }).catch(() => {
+    // Autoplay bloqueado — aguarda clique
+    el.apDisc.classList.remove('playing');
+    el.apBars.classList.remove('playing');
+  });
+
+  el.audioSrc.onended = () => {
+    clearInterval(el.audioSrc._progTimer);
+    el.apDisc.classList.remove('playing');
+    el.apBars.classList.remove('playing');
+    nextItem();
+  };
+  el.audioSrc.onerror = () => {
+    clearInterval(el.audioSrc._progTimer);
+    toast('⚠️ Erro no áudio'); setTimeout(nextItem, 1500);
+  };
+}
+
+function playYT(item) {
+  hideAllMedia();
+  el.ytWrap.style.display = 'block';
+  var rot = Number(item.rotation) || 0;
+  if (rot !== 0) {
+    applyMediaRotation(rot, el.ytWrap);
+    el.rotWarn.style.display = 'block';
+    setTimeout(function(){ el.rotWarn.style.display = 'none'; }, 5000);
+  }
+  if (!ytReady || !ytPlayer?.loadVideoById) { setTimeout(function(){ playYT(item); }, 800); return; }
+  ytPlayer.loadVideoById({videoId: item.youtube_id, startSeconds: 0});
+  ytPlayer.setVolume(curVol); if(isMuted) ytPlayer.mute(); else ytPlayer.unMute();
+}
+
+function playPdf(item) {
+  hideAllMedia();
+  const url = API.replace('/api','') + (item.url || '/storage/videos/' + item.filename);
+  const dur = (item.display_duration || 10) * 1000, t0 = Date.now();
+  el.pdfPlayer.src = url + '#toolbar=0&navpanes=0&scrollbar=0&view=Fit';
+  el.pdfPlayer.style.display = 'block';
+  applyMediaRotation(item.rotation, el.pdfPlayer);
+  el.progWrap.style.display = 'block'; el.progBar.style.width = '0%';
+  imgProgT = setInterval(function(){ el.progBar.style.width = Math.min(((Date.now()-t0)/dur)*100,100)+'%'; }, 100);
+  imgTimer = setTimeout(function(){ stopTimers(); nextItem(); }, dur);
+}
+
+el.video.addEventListener('ended', nextItem);
+el.video.addEventListener('error', ()=>{ toast('⚠️ Erro no vídeo'); setTimeout(nextItem,1500); });
+
+// ── Orientação da TV ─────────────────────────────────────────────
+function applyOrientation(orientation) {
+  document.body.classList.remove('portrait-left','portrait-right');
+  if (orientation === 'vertical' || orientation === 'portrait-left') {
+    document.body.classList.add('portrait-left');
+  } else if (orientation === 'portrait-right') {
+    document.body.classList.add('portrait-right');
+  }
+  // 'horizontal' → sem classe
+}
+
+function connectSocket() {
+  if (socket) socket.disconnect();
+  socket = io(window.location.origin);
+
+  socket.on('connect', () => {
+    socket.emit('join-tv', cfg.tvId);
+    console.log('🔌 Socket conectado, TV:', cfg.tvId);
+  });
+
+  // Atualização automática: playlist, widget, agendamento, config de TV mudou
+  socket.on('content-changed', async (data) => {
+    console.log('📡 content-changed:', data?.reason);
+    flashBanner();
+    await syncAndRefresh();
+  });
+
+  // Compatibilidade com evento legado
+  socket.on('playlist-changed', async () => {
+    flashBanner();
+    await syncAndRefresh();
+  });
+
+  // Emergência (prioridade máxima — direto)
+  socket.on('emergency-update', em => applyEmergency(em));
+
+  // Reload forçado pelo painel (corrigir bugs sem ir até a TV)
+  socket.on('force-reload', () => {
+    toast('🔄 Recarregando...');
+    // Sinaliza que o próximo carregamento deve entrar em fullscreen automaticamente
+    try { sessionStorage.setItem('_fs_reload', '1'); } catch {}
+    setTimeout(() => location.reload(), 1200);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔌 Socket desconectado, tentando em 5s...');
+    setTimeout(connectSocket, 5000);
+  });
+}
+
+// ── Sync ─────────────────────────────────────────────────────────
+async function fetchConfig() {
+  const r=await fetch(`${API}/player/${cfg.tvId}/config`);
+  if (r.status===404) throw Object.assign(new Error('TV removida'),{code:404});
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+async function syncAndRefresh() {
+  try {
+    const data = await fetchConfig();
+    const newPl = data.playlist || [];
+    shuffleMode = !!(data.shuffle);
+    if (shuffleMode && newPl.length) { buildShuffleOrder(newPl.length); playItem._shufflePos = 0; }
+
+    // Comparar apenas id+order para evitar falsos positivos (config, timestamps, etc.)
+    const sig = pl => pl.map(v => v.id).join(',');
+    const changed = sig(newPl) !== sig(playlist);
+
+    if (changed) {
+      const curItem = playlist[curIdx];
+      // Verificar se o item que está tocando AGORA ainda existe na nova playlist
+      const curStillExists = curItem && newPl.some(v => v.id === curItem.id);
+      const curNewIdx = curItem ? newPl.findIndex(v => v.id === curItem.id) : -1;
+
+      playlist = newPl;
+
+      if (playlist.length && isPlaying && !emergency.active) {
+        if (curStillExists) {
+          // Item atual ainda existe: atualiza o índice sem reiniciar
+          curIdx = curNewIdx;
+          toast(`🔄 Playlist atualizada · ${playlist.length} item(s)`);
+        } else {
+          // Item atual foi removido: aí sim reinicia do início
+          stopTimers();
+          playItem(0);
+          toast((data.active_schedule ? `🕐 ${data.active_schedule.name}` : `🔄 Playlist atualizada`) + ` · ${playlist.length} item(s)`);
+        }
+      }
+    }
+
+    if (data.tv) {
+      tvConf = data.tv;
+      if (data.tv.volume != null) setVol(data.tv.volume);
+      applyOrientation(data.tv.orientation || 'horizontal');
+    }
+    if (data.emergency) applyEmergency(data.emergency);
+    if (data.widgets)   { widgets = data.widgets; await renderWidgets(data.widgets); }
+    if (data.sponsorGroups !== undefined) initSponsors(data.sponsorGroups);
+  } catch(e) { console.warn('Sync error:', e.message); }
+}
+
+// ── Heartbeat ────────────────────────────────────────────────────
+async function sendHeartbeat(name) {
+  if (!cfg.tvId||!isPlaying) return;
+  try {
+    await fetch(`${API}/player/${cfg.tvId}/heartbeat`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({currentVideo:name||null,playbackTime:Math.round(el.video.currentTime||0)})
+    });
+  } catch {}
+}
+
+// ── Init ─────────────────────────────────────────────────────────
+async function loadTVList() {
+  try {
+    showOverlay(`Conectando a ${API}...`);
+    const tvs=await fetch(`${API}/player/tvs`).then(r=>r.json());
+    el.tvSelect.innerHTML='<option value="">— Selecione uma TV —</option>';
+    tvs.forEach(tv=>{ const o=document.createElement('option');o.value=tv.id;o.textContent=tv.name;o.dataset.name=tv.name;el.tvSelect.appendChild(o); });
+  } catch(e) {
+    el.tvSelect.innerHTML='<option value="">Erro ao carregar TVs</option>';
+    showOverlay(`❌ Sem conexão com o servidor\n${API}\n\n${e.message}`,'error');
+    el.errorBtns.classList.remove('hidden');
+  }
+}
+
+async function startPlayer() {
+  showOverlay('Conectando...');
+  try {
+    const data=await fetchConfig();
+    playlist  = data.playlist  || [];
+    widgets   = data.widgets   || [];
+    emergency = data.emergency || {active:0};
+    tvConf    = data.tv        || {};
+    shuffleMode = !!(data.shuffle);
+    if (shuffleMode && playlist.length) { buildShuffleOrder(playlist.length); playItem._shufflePos = 0; }
+
+    if (!playlist.length && !emergency.active) {
+      showOverlay('Playlist vazia. Configure no painel.','error');
+      el.errorBtns.classList.remove('hidden'); return;
+    }
+
+    hideOverlay();
+    el.media.classList.remove('hidden');
+    isPlaying = true;
+
+    if (tvConf.volume!=null) setVol(tvConf.volume);
+    applyOrientation(tvConf.orientation || 'horizontal');
+
+    renderWidgets(widgets).catch(console.warn);
+    applyEmergency(emergency);
+    initSponsors(data.sponsorGroups || []);
+
+    if (!emergency.active && playlist.length) {
+      toast(`▶ ${playlist.length} item(s)`);
+      playItem(0);
+    }
+
+    connectSocket();
+    startWeatherRefresh();
+
+    clearInterval(syncTimer);
+    syncTimer = setInterval(syncAndRefresh, 30000);
+    clearInterval(hbTimer);
+    hbTimer = setInterval(()=>{ const item=playlist[curIdx]; sendHeartbeat(item?.name||null); }, 15000);
+
+    try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch {}
+
+    // Re-adquirir wake lock quando aba ganha foco (ex: TV saiu do descanso de tela)
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible' && 'wakeLock' in navigator) {
+        try { await navigator.wakeLock.request('screen'); } catch {}
+      }
+    });
+
+    // Fullscreen automático — tenta direto, se falhar aguarda 1 interação do usuário
+    // Se veio de um reload do painel (_fs_reload), o browser já "confia" na sessão
+    var needFS = !isFS();
+    var fsFromReload = false;
+    try { fsFromReload = sessionStorage.getItem('_fs_reload') === '1'; sessionStorage.removeItem('_fs_reload'); } catch {}
+
+    if (needFS) {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch {
+        if (fsFromReload) {
+          // Reload iniciado pelo painel: tentar de novo após pequeno delay
+          // (alguns browsers aceitam na mesma "task" do reload)
+          setTimeout(async function() {
+            try { if (!isFS()) await document.documentElement.requestFullscreen(); } catch {}
+          }, 500);
+          setTimeout(async function() {
+            try { if (!isFS()) await document.documentElement.requestFullscreen(); } catch {}
+          }, 2000);
+        }
+        // Fallback: primeiro clique entra em fullscreen
+        document.body.addEventListener('click', ()=>{ if(!isFS()) toggleFS(); }, {once:true});
+      }
+    }
+
+  } catch(e) {
+    showOverlay('Erro: '+e.message,'error');
+    el.errorBtns.classList.remove('hidden');
+  }
+}
+
+function loadCfg() { try { const s=localStorage.getItem('indoorTvCfg'); if(s) cfg=JSON.parse(s); } catch {} }
+function saveCfg() { localStorage.setItem('indoorTvCfg',JSON.stringify(cfg)); }
+function resetCfg() {
+  localStorage.removeItem('indoorTvCfg'); cfg={tvId:null,tvName:null};
+  clearInterval(syncTimer); clearInterval(hbTimer); clearInterval(wTimer);
+  stopTimers(); stopSiren();
+  if (socket) socket.disconnect(); init();
+}
+
+async function init() {
+  // ?reset=1 na URL limpa config salva (útil ao trocar IP/porta do servidor)
+  if (new URLSearchParams(window.location.search).get('reset') === '1') {
+    localStorage.removeItem('indoorTvCfg');
+    history.replaceState(null, '', window.location.pathname);
+  }
+  loadCfg();
+
+  // Timeout de segurança: se após 10s ainda estiver em "Inicializando...", mostra erro
+  const safetyTimer = setTimeout(() => {
+    if (el.overlayMsg.textContent === 'Inicializando...') {
+      showOverlay(`⏱ Tempo esgotado\nServidor: ${API}\n\nVerifique se o servidor está rodando e se o endereço está correto.`, 'error');
+      el.errorBtns.classList.remove('hidden');
+    }
+  }, 10000);
+
+  try {
+    if (cfg.tvId) await startPlayer();
+    else { await loadTVList(); showOverlay('Configure este player','setup'); }
+  } catch(e) {
+    showOverlay(`❌ Erro: ${e.message}\nServidor: ${API}`, 'error');
+    el.errorBtns.classList.remove('hidden');
+  } finally {
+    clearTimeout(safetyTimer);
+  }
+}
+
+$('connect-btn').onclick = async()=>{
+  const sel=el.tvSelect; if(!sel.value){alert('Selecione uma TV');return;}
+  cfg.tvId=sel.value; cfg.tvName=sel.options[sel.selectedIndex].dataset.name;
+  saveCfg(); await startPlayer();
+};
+$('reset-btn').onclick = resetCfg;
+$('retry-btn').onclick = ()=>location.reload();
+
+document.addEventListener('visibilitychange',()=>{
+  if (!document.hidden && isPlaying) { try{navigator.wakeLock?.request('screen');}catch{} }
+});
+
+init();
+</script>
+</div><!-- /stage -->
+</body>
+</html>
