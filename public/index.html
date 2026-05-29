@@ -55,6 +55,7 @@ const api = {
   createTV:d=>api._f(`${API}/tvs`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
   updateTV:(id,d)=>api._f(`${API}/tvs/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
   deleteTV:id=>api._f(`${API}/tvs/${id}`,{method:'DELETE'}),
+  regenPin:id=>api._f(`${API}/tvs/${id}/regen-pin`,{method:'POST'}).then(r=>r.json()),
   getPlaylists:()=>api._f(`${API}/playlists`).then(r=>r.json()),
   createPlaylist:d=>api._f(`${API}/playlists`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
   updatePlaylist:(id,d)=>api._f(`${API}/playlists/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
@@ -510,12 +511,14 @@ function TVsPage({tvs,playlists,onUpdate,showToast,reloadTVs}){
               <div className="flex justify-between"><span>Volume</span><span className="font-medium text-gray-700">{tv.volume??100}%</span></div>
               <div className="flex justify-between"><span>Transição</span><span className="font-medium text-gray-700 capitalize">{tv.transition||'fade'}</span></div>
               <div className="flex justify-between"><span>Último ping</span><span>{fmt.time(tv.last_seen)}</span></div>
+              <div className="flex justify-between items-center"><span>PIN do Player</span><span className="font-mono font-bold text-blue-600 tracking-widest text-sm">{tv.pin||'—'}</span></div>
             </div>
             <div className="flex gap-1.5 flex-wrap">
               <button onClick={()=>open(tv)} className="flex-1 text-xs border border-gray-200 hover:border-blue-300 hover:text-blue-600 py-1.5 rounded-lg transition">✏️ Editar</button>
               <button onClick={()=>setPreviewTv(tv)} className="flex-1 text-xs border border-gray-200 hover:border-purple-300 hover:text-purple-600 py-1.5 rounded-lg transition">👁 Preview</button>
               <button onClick={()=>reloadTVs(tv.id)} title="Recarregar esta TV" className="text-xs border border-gray-200 hover:border-orange-300 hover:text-orange-600 px-2.5 py-1.5 rounded-lg transition">🔄</button>
               <button onClick={()=>{navigator.clipboard.writeText(tv.id);showToast('ID copiado!');}} className="text-xs border border-gray-200 px-2.5 py-1.5 rounded-lg transition hover:border-gray-300">📋</button>
+              <button onClick={async()=>{if(!confirm('Gerar novo PIN para esta TV?'))return;const t=await api.regenPin(tv.id);onUpdate();showToast(`Novo PIN: ${t.pin}`);}} className="text-xs border border-gray-200 hover:border-yellow-300 hover:text-yellow-600 px-2.5 py-1.5 rounded-lg transition" title="Gerar novo PIN">🔑</button>
               <button onClick={()=>del(tv.id)} className="text-xs text-red-400 border border-gray-200 hover:border-red-300 px-2.5 py-1.5 rounded-lg transition">🗑</button>
             </div>
           </div>
@@ -553,10 +556,17 @@ function TVsPage({tvs,playlists,onUpdate,showToast,reloadTVs}){
             </Sel>
           </div>
         </div>
-        {edit&&<div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 mt-1">
-          <p className="font-semibold mb-1">URL do player:</p>
-          <p className="font-mono break-all">{playerUrl(edit.id)}</p>
-          <p className="mt-1 opacity-70">Abra esta URL no navegador da TV</p>
+        {edit&&<div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 mt-1 space-y-2">
+          <div>
+            <p className="font-semibold mb-1">🌐 URL do player:</p>
+            <p className="font-mono break-all">{playerUrl(edit.id)}</p>
+            <p className="mt-1 opacity-70">Abra esta URL no navegador da TV</p>
+          </div>
+          <div className="border-t border-blue-200 pt-2">
+            <p className="font-semibold mb-1">🔑 PIN de conexão:</p>
+            <p className="font-mono font-bold text-2xl tracking-widest text-blue-800 text-center py-1">{edit.pin||'—'}</p>
+            <p className="opacity-70 text-center">Digite este código no player para conectar</p>
+          </div>
         </div>}
       </Modal>}
 

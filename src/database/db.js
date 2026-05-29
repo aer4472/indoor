@@ -156,6 +156,7 @@ class Database {
             'ALTER TABLE playlists ADD COLUMN shuffle INTEGER DEFAULT 0',
             'ALTER TABLE widgets ADD COLUMN tv_ids TEXT DEFAULT ""',
             'ALTER TABLE widgets ADD COLUMN rotation INTEGER DEFAULT 0',
+            'ALTER TABLE tvs ADD COLUMN pin TEXT',
           ];
           for (const sql of migrations) {
             try { await this.run(sql); } catch {}

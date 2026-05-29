@@ -6,6 +6,11 @@ const broadcast = require('../broadcast');
 
 function setIO(io) { broadcast.setIO(io); }
 
+function genPin() {
+  // Gera PIN de 6 dígitos único e fácil de digitar
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const tvs = await db.all('SELECT * FROM tvs ORDER BY created_at DESC');
@@ -18,9 +23,10 @@ router.post('/', async (req, res, next) => {
     const { name, orientation='horizontal', playlist_id, volume=100, transition='fade' } = req.body;
     if (!name) return res.status(400).json({ error: 'name obrigatório' });
     const id = `tv-${uuidv4().substring(0,8)}`;
+    const pin = genPin();
     await db.run(
-      'INSERT INTO tvs (id,name,orientation,playlist_id,volume,transition,status) VALUES (?,?,?,?,?,?,?)',
-      [id, name, orientation, playlist_id||null, volume, transition, 'offline']
+      'INSERT INTO tvs (id,name,orientation,playlist_id,volume,transition,status,pin) VALUES (?,?,?,?,?,?,?,?)',
+      [id, name, orientation, playlist_id||null, volume, transition, 'offline', pin]
     );
     const tv = await db.get('SELECT * FROM tvs WHERE id = ?', [id]);
     res.status(201).json(tv);
@@ -61,6 +67,16 @@ router.post('/reload', async (req, res, next) => {
     const { tv_id } = req.body; // null = todas as TVs
     broadcast.forceReload(tv_id || null);
     res.json({ success: true, target: tv_id || 'all' });
+  } catch (e) { next(e); }
+});
+
+// Gerar novo PIN para uma TV
+router.post('/:id/regen-pin', async (req, res, next) => {
+  try {
+    const pin = genPin();
+    await db.run('UPDATE tvs SET pin = ? WHERE id = ?', [pin, req.params.id]);
+    const tv = await db.get('SELECT * FROM tvs WHERE id = ?', [req.params.id]);
+    res.json(tv);
   } catch (e) { next(e); }
 });
 

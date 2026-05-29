@@ -202,6 +202,11 @@
     .card-wc.layout-stack .wc-divider{width:55%;height:1px;justify-self:center;align-self:auto;}
 
     .hidden{display:none!important;}
+    .pin-digit{width:46px;height:58px;text-align:center;font-size:26px;font-weight:700;color:#fff;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.25);border-radius:12px;outline:none;caret-color:transparent;}
+    .pin-digit:focus{border-color:#3b82f6;background:rgba(59,130,246,.2);}
+    .pin-digit.filled{border-color:rgba(255,255,255,.5);}
+    .pin-digit.error{border-color:#f87171;animation:shake .3s ease;}
+    @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
   </style>
 </head>
 <body>
@@ -215,21 +220,21 @@
     <p id="overlay-msg">Inicializando...</p>
     <div id="spinner" class="spinner"></div>
     <div id="setup-form" class="hidden">
-      <!-- Passo 1: senha -->
-      <div id="step-password">
-        <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:14px;">🔐 Digite a senha do painel para continuar</div>
-        <input id="setup-password" type="password" placeholder="Senha do sistema" autocomplete="off"
-          style="width:100%;padding:11px 14px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;color:#fff;font-size:14px;margin-bottom:10px;outline:none;"/>
-        <div id="password-error" style="color:#f87171;font-size:12px;margin-bottom:8px;display:none;">❌ Senha incorreta. Tente novamente.</div>
-        <button class="btn-primary" id="auth-btn">🔓 Autenticar</button>
+      <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:18px;line-height:1.5;">
+        🔑 Digite o PIN de 6 dígitos exibido no painel admin para esta TV
       </div>
-      <!-- Passo 2: selecionar TV -->
-      <div id="step-tv" class="hidden">
-        <div style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:14px;">📺 Selecione a TV para este display</div>
-        <select id="tv-select"><option value="">— Selecione uma TV —</option></select>
-        <button class="btn-primary" id="connect-btn">▶ Conectar</button>
-        <button class="btn-sec" style="width:100%;padding:10px;border:none;border-radius:10px;font-size:13px;cursor:pointer;margin-top:8px;" id="back-btn">← Voltar</button>
+      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:12px;" id="pin-boxes">
+        <input class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" type="text"/>
+        <input class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" type="text"/>
+        <input class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" type="text"/>
+        <input class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" type="text"/>
+        <input class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" type="text"/>
+        <input class="pin-digit" maxlength="1" inputmode="numeric" pattern="[0-9]" type="text"/>
       </div>
+      <div id="password-error" style="color:#f87171;font-size:12px;margin-bottom:8px;display:none;">❌ PIN inválido. Verifique o painel admin.</div>
+      <button class="btn-primary" id="auth-btn">▶ Conectar</button>
+      <!-- tv-select mantido para compatibilidade, oculto -->
+      <select id="tv-select" style="display:none"></select>
     </div>
     <div id="error-btns" class="btn-group hidden">
       <button class="btn-sec" id="reset-btn">🔄 Reconfigurar</button>
@@ -1842,7 +1847,7 @@ async function startPlayer() {
 function loadCfg() { try { const s=localStorage.getItem('indoorTvCfg'); if(s) cfg=JSON.parse(s); } catch {} }
 function saveCfg() { localStorage.setItem('indoorTvCfg',JSON.stringify(cfg)); }
 function resetCfg() {
-  localStorage.removeItem('indoorTvCfg'); cfg={tvId:null,tvName:null,authToken:null};
+  localStorage.removeItem('indoorTvCfg'); cfg={tvId:null,tvName:null};
   clearInterval(syncTimer); clearInterval(hbTimer); clearInterval(wTimer);
   stopTimers(); stopSiren();
   if (socket) socket.disconnect(); init();
@@ -1866,25 +1871,7 @@ async function init() {
 
   try {
     if (cfg.tvId) await startPlayer();
-    else {
-      showOverlay('Configure este player','setup');
-      // Se já tiver token salvo, pula direto para seleção de TV
-      if (cfg.authToken) {
-        try {
-          await loadTVList();
-          $('step-password').classList.add('hidden');
-          $('step-tv').classList.remove('hidden');
-        } catch(e) {
-          // Token inválido, volta para senha
-          cfg.authToken = null; saveCfg();
-          $('step-password').classList.remove('hidden');
-          $('step-tv').classList.add('hidden');
-        }
-      } else {
-        $('step-password').classList.remove('hidden');
-        $('step-tv').classList.add('hidden');
-      }
-    }
+    else { showOverlay('Digite o PIN da TV','setup'); document.querySelector('.pin-digit')?.focus(); }
   } catch(e) {
     showOverlay(`❌ Erro: ${e.message}\nServidor: ${API}`, 'error');
     el.errorBtns.classList.remove('hidden');
@@ -1893,45 +1880,70 @@ async function init() {
   }
 }
 
-// ── Auth setup ───────────────────────────────────────────────────
+// ── PIN setup ────────────────────────────────────────────────────
+(function setupPinInput() {
+  const boxes = Array.from(document.querySelectorAll('.pin-digit'));
+
+  boxes.forEach((box, i) => {
+    box.addEventListener('input', e => {
+      const v = e.target.value.replace(/\D/g,'');
+      e.target.value = v ? v[v.length-1] : '';
+      e.target.classList.toggle('filled', !!e.target.value);
+      if (e.target.value && i < boxes.length - 1) boxes[i+1].focus();
+      if (boxes.every(b => b.value)) $('auth-btn').click();
+    });
+    box.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !box.value && i > 0) {
+        boxes[i-1].value = '';
+        boxes[i-1].classList.remove('filled');
+        boxes[i-1].focus();
+      }
+      if (e.key === 'Enter') $('auth-btn').click();
+    });
+    box.addEventListener('paste', e => {
+      e.preventDefault();
+      const txt = (e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'').substring(0,6);
+      boxes.forEach((b,j) => { b.value = txt[j]||''; b.classList.toggle('filled', !!b.value); });
+      if (txt.length >= 6) $('auth-btn').click();
+      else boxes[Math.min(txt.length, 5)].focus();
+    });
+  });
+})();
+
 $('auth-btn').onclick = async () => {
-  const pwd = $('setup-password').value.trim();
-  if (!pwd) { $('setup-password').focus(); return; }
+  const boxes = Array.from(document.querySelectorAll('.pin-digit'));
+  const pin = boxes.map(b => b.value).join('');
+  if (pin.length < 6) { boxes[pin.length]?.focus(); return; }
+
   $('auth-btn').disabled = true;
   $('auth-btn').textContent = 'Verificando...';
   $('password-error').style.display = 'none';
+  boxes.forEach(b => b.classList.remove('error'));
+
   try {
-    const r = await fetch(`${API}/auth/login`, {
+    const r = await fetch(`${API}/player/auth-tv`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({username:'admin', password: pwd})
+      body: JSON.stringify({ pin })
     });
     if (r.ok) {
       const data = await r.json();
-      cfg.authToken = data.token;
+      cfg.tvId   = data.tvId;
+      cfg.tvName = data.tvName;
       saveCfg();
-      await loadTVList();
-      $('step-password').classList.add('hidden');
-      $('step-tv').classList.remove('hidden');
+      await startPlayer();
     } else {
       $('password-error').style.display = 'block';
-      $('setup-password').value = '';
-      $('setup-password').focus();
+      boxes.forEach(b => { b.value=''; b.classList.remove('filled'); b.classList.add('error'); });
+      setTimeout(() => boxes.forEach(b => b.classList.remove('error')), 600);
+      boxes[0].focus();
     }
   } catch(e) {
     $('password-error').textContent = '❌ Erro de conexão com o servidor.';
     $('password-error').style.display = 'block';
   }
   $('auth-btn').disabled = false;
-  $('auth-btn').textContent = '🔓 Autenticar';
-};
-$('setup-password').onkeydown = e => { if(e.key==='Enter') $('auth-btn').click(); };
-
-$('back-btn').onclick = () => {
-  $('step-tv').classList.add('hidden');
-  $('step-password').classList.remove('hidden');
-  $('setup-password').value = '';
-  $('password-error').style.display = 'none';
+  $('auth-btn').textContent = '▶ Conectar';
 };
 
 $('connect-btn').onclick = async()=>{
