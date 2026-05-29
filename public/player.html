@@ -287,13 +287,23 @@ window.onYouTubeIframeAPIReady = () => {
   ytReady = true;
   ytPlayer = new YT.Player('youtube-player', {
     width:'100%', height:'100%',
-    playerVars:{autoplay:1,controls:0,modestbranding:1,rel:0,iv_load_policy:3,fs:0,disablekb:1,playsinline:1},
+    playerVars:{autoplay:1,controls:0,modestbranding:1,rel:0,iv_load_policy:3,fs:0,disablekb:1,playsinline:1,mute:1},
     events:{
-      onStateChange: e => { if(e.data===YT.PlayerState.ENDED) nextItem(); },
-      onError: ()=>{ toast('⚠️ Erro YouTube'); setTimeout(nextItem,2000); }
+      onReady: e => { e.target.unMute(); e.target.setVolume(curVol || 80); },
+      onStateChange: e => {
+        if(e.data===YT.PlayerState.ENDED) nextItem();
+        if(e.data===YT.PlayerState.PLAYING){ e.target.unMute(); e.target.setVolume(curVol||80); }
+      },
+      onError: e => {
+        console.warn('[YT] erro código:', e.data);
+        // Fallback: usar iframe direto
+        ytUseFallback = true;
+        playYT(ytCurrentItem);
+      }
     }
   });
 };
+let ytUseFallback = false, ytCurrentItem = null;
 
 // ── DOM ─────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -1555,6 +1565,7 @@ function playAudio(item) {
 
 function playYT(item) {
   hideAllMedia();
+  ytCurrentItem = item;
   el.ytWrap.style.display = 'block';
   var rot = Number(item.rotation) || 0;
   if (rot !== 0) {
@@ -1562,9 +1573,35 @@ function playYT(item) {
     el.rotWarn.style.display = 'block';
     setTimeout(function(){ el.rotWarn.style.display = 'none'; }, 5000);
   }
-  if (!ytReady || !ytPlayer?.loadVideoById) { setTimeout(function(){ playYT(item); }, 800); return; }
-  ytPlayer.loadVideoById({videoId: item.youtube_id, startSeconds: 0});
-  ytPlayer.setVolume(curVol); if(isMuted) ytPlayer.mute(); else ytPlayer.unMute();
+
+  var vid = item.youtube_id;
+
+  // Fallback: iframe direto (ignora IFrame API) — funciona melhor em HTTPS/Render
+  if (ytUseFallback || !ytReady || !ytPlayer?.loadVideoById) {
+    var wrap = document.getElementById('youtube-player');
+    if (wrap) {
+      wrap.innerHTML = '';
+      var ifr = document.createElement('iframe');
+      ifr.setAttribute('width','100%');
+      ifr.setAttribute('height','100%');
+      ifr.setAttribute('frameborder','0');
+      ifr.setAttribute('allow','autoplay; fullscreen');
+      ifr.setAttribute('allowfullscreen','');
+      ifr.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+      ifr.src = 'https://www.youtube-nocookie.com/embed/' + vid +
+        '?autoplay=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3&fs=0&disablekb=1&playsinline=1' +
+        (isMuted ? '&mute=1' : '&mute=0') +
+        '&enablejsapi=0';
+      wrap.appendChild(ifr);
+      // Avança para o próximo item com base na duração configurada
+      var dur = (item.display_duration || 60) * 1000;
+      if (dur > 0) { stopTimers(); imgTimer = setTimeout(function(){ stopTimers(); nextItem(); }, dur); }
+    }
+    return;
+  }
+
+  ytPlayer.loadVideoById({videoId: vid, startSeconds: 0});
+  if (isMuted) ytPlayer.mute(); else { ytPlayer.unMute(); ytPlayer.setVolume(curVol || 80); }
 }
 
 function playPdf(item) {
