@@ -1762,6 +1762,12 @@ async function syncAndRefresh() {
 
       playlist = newPl;
 
+      // Se estava aguardando playlist (isPlaying=false), inicia agora
+      if (playlist.length && !isPlaying) {
+        clearTimeout(window._waitPlaylistTimer);
+        startPlayer();
+        return;
+      }
       if (playlist.length && isPlaying && !emergency.active) {
         if (curStillExists) {
           // Item atual ainda existe: atualiza o índice sem reiniciar
@@ -1824,8 +1830,12 @@ async function startPlayer() {
     if (shuffleMode && playlist.length) { buildShuffleOrder(playlist.length); playItem._shufflePos = 0; }
 
     if (!playlist.length && !emergency.active) {
-      showOverlay('Playlist vazia. Configure no painel.','error');
-      el.errorBtns.classList.remove('hidden'); return;
+      showOverlay('📺 Nenhuma playlist configurada\n\nAcesse o painel admin e atribua uma playlist a esta TV.\n\nAguardando atualização...', 'loading');
+      el.spinner.style.display = 'block';
+      // Tenta novamente a cada 30s sem precisar de interação
+      clearTimeout(window._waitPlaylistTimer);
+      window._waitPlaylistTimer = setTimeout(() => startPlayer(), 30000);
+      return;
     }
 
     hideOverlay();
