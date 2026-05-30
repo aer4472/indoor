@@ -272,12 +272,6 @@
     <img    id="image-player" alt=""/>
     <div id="youtube-wrap">
       <div id="youtube-player"></div>
-      <div id="yt-play-overlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.7);z-index:10;cursor:pointer;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
-        <div style="width:80px;height:80px;background:rgba(255,0,0,.9);border-radius:50%;display:flex;align-items:center;justify-content:center;">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
-        </div>
-        <span style="color:#fff;font-size:16px;font-weight:600;">Toque para iniciar</span>
-      </div>
     </div>
     <iframe id="pdf-player" title="PDF"></iframe>
     <audio id="audio-src" preload="auto"></audio>
@@ -1639,7 +1633,7 @@ function playYT(item) {
   wrap.innerHTML = '';
 
   // --- Overlay de play (necessário para primeiro clique no Chrome) ---
-  var overlay = document.getElementById('yt-play-overlay');
+  var overlay = null; // overlay removed
 
   function createIframe(muted) {
     wrap.innerHTML = '';
@@ -1664,7 +1658,6 @@ function playYT(item) {
     } catch(e) {}
   }, 1500);
 
-  if (overlay) overlay.style.display = 'none';
 
   function onMsg(e) {
     try {
@@ -1738,7 +1731,11 @@ function connectSocket() {
   // Reload forçado pelo painel (corrigir bugs sem ir até a TV)
   socket.on('force-reload', () => {
     toast('🔄 Recarregando...');
-    try { sessionStorage.setItem('_fs_reload', '1'); } catch {}
+    try {
+      sessionStorage.setItem('_fs_reload', '1');
+      // Preserva tvId para reconectar sem pedir PIN
+      sessionStorage.setItem('_reload_tvid', cfg.tvId || '');
+    } catch {}
     setTimeout(() => location.reload(), 1200);
   });
 
@@ -1951,6 +1948,16 @@ async function init() {
     history.replaceState(null, '', window.location.pathname);
   }
   loadCfg();
+
+  // Verifica se veio de um force-reload — reconecta direto sem pedir PIN
+  try {
+    var reloadTvId = sessionStorage.getItem('_reload_tvid');
+    if (reloadTvId) {
+      sessionStorage.removeItem('_reload_tvid');
+      cfg.tvId = reloadTvId;
+      saveCfg();
+    }
+  } catch(e) {}
 
   // Sem tvId salvo: mostra PIN imediatamente, sem falar com servidor
   if (!cfg.tvId) {
