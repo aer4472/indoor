@@ -56,6 +56,7 @@ const api = {
   updateTV:(id,d)=>api._f(`${API}/tvs/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
   deleteTV:id=>api._f(`${API}/tvs/${id}`,{method:'DELETE'}),
   regenPin:id=>api._f(`${API}/tvs/${id}/regen-pin`,{method:'POST'}).then(r=>r.json()),
+  disconnectTV:id=>api._f(`${API}/tvs/${id}/disconnect`,{method:'POST'}).then(r=>r.json()),
   getPlaylists:()=>api._f(`${API}/playlists`).then(r=>r.json()),
   createPlaylist:d=>api._f(`${API}/playlists`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
   updatePlaylist:(id,d)=>api._f(`${API}/playlists/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
@@ -519,6 +520,7 @@ function TVsPage({tvs,playlists,onUpdate,showToast,reloadTVs}){
               <button onClick={()=>reloadTVs(tv.id)} title="Recarregar esta TV" className="text-xs border border-gray-200 hover:border-orange-300 hover:text-orange-600 px-2.5 py-1.5 rounded-lg transition">🔄</button>
               <button onClick={()=>{navigator.clipboard.writeText(tv.id);showToast('ID copiado!');}} className="text-xs border border-gray-200 px-2.5 py-1.5 rounded-lg transition hover:border-gray-300">📋</button>
               <button onClick={async()=>{if(!confirm('Gerar novo PIN para esta TV?'))return;const t=await api.regenPin(tv.id);onUpdate();showToast(`Novo PIN: ${t.pin}`);}} className="text-xs border border-gray-200 hover:border-yellow-300 hover:text-yellow-600 px-2.5 py-1.5 rounded-lg transition" title="Gerar novo PIN">🔑</button>
+              <button onClick={async()=>{if(!confirm(`Desconectar a TV "${tv.name}"?\nEla voltará para a tela de PIN.`))return;await api.disconnectTV(tv.id);onUpdate();showToast('📴 TV desconectada');}} className="text-xs border border-gray-200 hover:border-red-300 hover:text-red-500 px-2.5 py-1.5 rounded-lg transition" title="Desconectar TV">📴</button>
               <button onClick={()=>del(tv.id)} className="text-xs text-red-400 border border-gray-200 hover:border-red-300 px-2.5 py-1.5 rounded-lg transition">🗑</button>
             </div>
           </div>

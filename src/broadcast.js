@@ -29,6 +29,13 @@ const broadcast = {
     }
   },
 
+  // Enviar evento para uma TV específica
+  toTV: (tvId, event, data) => {
+    if (!_io) return;
+    _io.to(`tv-${tvId}`).emit(event, data);
+    console.log(`📡 ${event} → tv-${tvId}`);
+  },
+
   // Notificar painel admin
   toAdmin: (event, data) => {
     if (!_io) return;

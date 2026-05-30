@@ -70,6 +70,24 @@ router.post('/reload', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// Desconectar TV — limpa tvId do player via Socket e reseta PIN
+router.post('/:id/disconnect', async (req, res, next) => {
+  try {
+    const tv = await db.get('SELECT * FROM tvs WHERE id = ?', [req.params.id]);
+    if (!tv) return res.status(404).json({ error: 'TV não encontrada' });
+
+    // Gera novo PIN para invalidar a sessão atual
+    const newPin = genPin();
+    await db.run('UPDATE tvs SET pin = ?, status = ? WHERE id = ?', [newPin, 'offline', req.params.id]);
+
+    // Envia comando via Socket para o player se desconectar
+    broadcast.toTV(req.params.id, 'force-disconnect', { message: 'Desconectado pelo administrador' });
+
+    const updated = await db.get('SELECT * FROM tvs WHERE id = ?', [req.params.id]);
+    res.json(updated);
+  } catch (e) { next(e); }
+});
+
 // Gerar novo PIN para uma TV
 router.post('/:id/regen-pin', async (req, res, next) => {
   try {

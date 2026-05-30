@@ -1724,9 +1724,19 @@ function connectSocket() {
   // Reload forçado pelo painel (corrigir bugs sem ir até a TV)
   socket.on('force-reload', () => {
     toast('🔄 Recarregando...');
-    // Sinaliza que o próximo carregamento deve entrar em fullscreen automaticamente
     try { sessionStorage.setItem('_fs_reload', '1'); } catch {}
     setTimeout(() => location.reload(), 1200);
+  });
+
+  socket.on('force-disconnect', () => {
+    cfg.tvId = null; cfg.tvName = null; saveCfg();
+    clearInterval(syncTimer); clearInterval(hbTimer); stopTimers();
+    socket.disconnect(); socket = null;
+    isPlaying = false;
+    hideOverlay();
+    el.media.classList.add('hidden');
+    showOverlay('📴 TV desconectada pelo administrador\n\nDigite o PIN para reconectar.', 'setup');
+    setTimeout(() => document.querySelector('.pin-digit')?.focus(), 100);
   });
 
   socket.on('disconnect', () => {
