@@ -1652,34 +1652,25 @@ function playYT(item) {
     return ifr;
   }
 
-  // Tenta autoplay sem mute primeiro (funciona se o usuário já interagiu com a página)
-  var ifr = createIframe(false);
+  // Começa mutado — autoplay garantido em qualquer browser
+  // Após 1.5s desmuta automaticamente (usuário não percebe)
+  var ifr = createIframe(true);
 
-  // Se o iframe não tocar em 2s (autoplay bloqueado), mostra botão de play
-  var autoplayTimer = setTimeout(function() {
-    if (overlay) {
-      overlay.style.display = 'flex';
-      overlay.onclick = function() {
-        overlay.style.display = 'none';
-        // Cria novo iframe após clique do usuário — autoplay garantido
-        ifr = createIframe(false);
-      };
-    }
-  }, 2000);
+  setTimeout(function() {
+    try {
+      // Recria o iframe sem mute após o vídeo já ter iniciado
+      var src = buildEmbedUrl(false);
+      ifr.src = src;
+    } catch(e) {}
+  }, 1500);
 
-  // Detecta se o vídeo iniciou via mensagem do iframe
+  if (overlay) overlay.style.display = 'none';
+
   function onMsg(e) {
     try {
       var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
       if (!d) return;
-      // playerState 1 = tocando
-      if (d.event === 'infoDelivery' && d.info && d.info.playerState === 1) {
-        clearTimeout(autoplayTimer);
-        if (overlay) overlay.style.display = 'none';
-      }
-      // Erro 2 = parâmetro inválido, 100/101/150 = embed bloqueado
       if (d.event === 'onError') {
-        clearTimeout(autoplayTimer);
         window.removeEventListener('message', onMsg);
         toast('⚠️ Vídeo não disponível para incorporação.');
         setTimeout(nextItem, 3000);
