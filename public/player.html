@@ -67,7 +67,7 @@
     #video-canvas{display:none;position:absolute;top:0;left:0;width:100%;height:100%;}
     #image-player{width:100%;height:100%;object-fit:contain;display:none;opacity:0;-webkit-transition:opacity .5s;transition:opacity .5s;}
     #image-player.active{opacity:1;}
-    #youtube-wrap{width:100%;height:100%;display:none;background:#000;}
+    #youtube-wrap{width:100%;height:100%;display:none;background:#000;position:relative;}
     #youtube-player{width:100%;height:100%;}
     #pdf-player{width:100%;height:100%;display:none;border:none;background:#111;}
     /* Aviso de rotação não suportada (YouTube no Tizen) */
@@ -271,7 +271,15 @@
     <video  id="video-player" autoplay muted playsinline></video>
     <canvas id="video-canvas"></canvas>
     <img    id="image-player" alt=""/>
-    <div    id="youtube-wrap"><div id="youtube-player"></div></div>
+    <div id="youtube-wrap">
+      <div id="youtube-player"></div>
+      <div id="yt-play-overlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.7);z-index:10;cursor:pointer;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+        <div style="width:80px;height:80px;background:rgba(255,0,0,.9);border-radius:50%;display:flex;align-items:center;justify-content:center;">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="white"><polygon points="5,3 19,12 5,21"/></svg>
+        </div>
+        <span style="color:#fff;font-size:16px;font-weight:600;">Toque para iniciar</span>
+      </div>
+    </div>
     <iframe id="pdf-player" title="PDF"></iframe>
     <audio id="audio-src" preload="auto"></audio>
     <div id="audio-player-wrap">
@@ -1667,6 +1675,22 @@ function playYT(item) {
     ifr.src = buildEmbedUrl();
     wrap.appendChild(ifr);
 
+    // Mostra overlay de play para contornar bloqueio de autoplay do Chrome
+    var overlay = document.getElementById('yt-play-overlay');
+    if (overlay) {
+      overlay.style.display = 'flex';
+      overlay.onclick = function() {
+        overlay.style.display = 'none';
+        // Recarrega o iframe com interação do usuário — agora o autoplay funciona
+        ifr.src = buildEmbedUrl();
+      };
+      // Remove overlay automaticamente após 800ms se o vídeo já iniciou
+      setTimeout(function() {
+        // Tenta verificar se o vídeo está tocando via postMessage
+        try { ifr.contentWindow.postMessage(JSON.stringify({event:'listening'}), '*'); } catch(e) {}
+      }, 500);
+    }
+
     // Detecta erro de embedding bloqueado pelo YouTube
     ifr.addEventListener('load', function() {
       // Verifica se o iframe carregou conteúdo real após 3s
@@ -1683,8 +1707,10 @@ function playYT(item) {
     window.addEventListener('message', function onYTMsg(e) {
       try {
         var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-        if (data && data.event === 'infoDelivery' && data.info && data.info.playerState === -1) {
-          // Estado -1 = não iniciado = provavelmente bloqueado
+        // Estado 1 = playing — esconde overlay
+        if (data && data.event === 'infoDelivery' && data.info && data.info.playerState === 1) {
+          var ov = document.getElementById('yt-play-overlay');
+          if (ov) ov.style.display = 'none';
         }
         if (data && data.event === 'onError') {
           var code = data.info;
