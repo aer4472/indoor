@@ -14,6 +14,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Sem cache para arquivos estáticos
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, '../public')));
 app.use('/storage/videos', express.static(path.join(__dirname, '../storage/videos')));
 app.use('/storage/logos',  express.static(path.join(__dirname, '../storage/logos')));
