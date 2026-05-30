@@ -1737,10 +1737,19 @@ function connectSocket() {
 
 // ── Sync ─────────────────────────────────────────────────────────
 async function fetchConfig() {
-  const r=await fetch(`${API}/player/${cfg.tvId}/config`);
-  if (r.status===404) throw Object.assign(new Error('TV removida'),{code:404});
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  try {
+    const r = await fetch(`${API}/player/${cfg.tvId}/config`, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (r.status===404) throw Object.assign(new Error('TV removida'),{code:404});
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  } catch(e) {
+    clearTimeout(timeout);
+    if (e.name === 'AbortError') throw new Error('Servidor não respondeu (timeout)');
+    throw e;
+  }
 }
 
 async function syncAndRefresh() {
@@ -1926,30 +1935,34 @@ async function init() {
     return;
   }
 
-  // Tem tvId salvo: tenta reconectar com timeout de 30s
+  // Tem tvId salvo: tenta reconectar com timeout curto
   let dotCount = 0;
-  showOverlay('Conectando ao servidor...');
+  showOverlay('Conectando...', 'loading');
+
+  // Animação de pontos
   const wakeMsg = setInterval(() => {
     dotCount++;
-    el.overlayMsg.textContent = 'Conectando ao servidor' + '.'.repeat((dotCount % 3) + 1);
-  }, 800);
+    el.overlayMsg.textContent = 'Conectando' + '.'.repeat((dotCount % 3) + 1);
+  }, 600);
 
+  // Timeout de 12s — se o servidor não responder, vai para PIN
   const safetyTimer = setTimeout(() => {
     clearInterval(wakeMsg);
     cfg.tvId = null; cfg.tvName = null; saveCfg();
     showOverlay('Digite o PIN da TV', 'setup');
     setTimeout(() => document.querySelector('.pin-digit')?.focus(), 50);
-  }, 30000);
+  }, 12000);
 
   try {
     await startPlayer();
+    clearTimeout(safetyTimer);
+    clearInterval(wakeMsg);
   } catch(e) {
+    clearTimeout(safetyTimer);
+    clearInterval(wakeMsg);
     cfg.tvId = null; cfg.tvName = null; saveCfg();
     showOverlay('Digite o PIN da TV', 'setup');
     setTimeout(() => document.querySelector('.pin-digit')?.focus(), 50);
-  } finally {
-    clearTimeout(safetyTimer);
-    clearInterval(wakeMsg);
   }
 }
 
