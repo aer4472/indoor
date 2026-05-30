@@ -8,8 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Indoor TV Player</title>
   <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
-  <script src="https://www.youtube.com/iframe_api"></script>
-  <style>
+    <style>
     *{margin:0;padding:0;box-sizing:border-box;}
     html,body{cursor:none !important;overflow:hidden;}
     body{background:#000;overflow:hidden;font-family:Arial,sans-serif;}
@@ -350,28 +349,8 @@ let syncTimer = null, hbTimer  = null, wTimer = null;
 let curVol    = 100, isMuted  = false;
 let audioCtx  = null, sirenNode = null;
 
-// ── YouTube ──────────────────────────────────────────────────────
-window.onYouTubeIframeAPIReady = () => {
-  ytReady = true;
-  ytPlayer = new YT.Player('youtube-player', {
-    width:'100%', height:'100%',
-    playerVars:{autoplay:1,controls:0,modestbranding:1,rel:0,iv_load_policy:3,fs:0,disablekb:1,playsinline:1,mute:1},
-    events:{
-      onReady: e => { e.target.unMute(); e.target.setVolume(curVol || 80); },
-      onStateChange: e => {
-        if(e.data===YT.PlayerState.ENDED) nextItem();
-        if(e.data===YT.PlayerState.PLAYING){ e.target.unMute(); e.target.setVolume(curVol||80); }
-      },
-      onError: e => {
-        console.warn('[YT] erro código:', e.data);
-        // Fallback: usar iframe direto
-        ytUseFallback = true;
-        playYT(ytCurrentItem);
-      }
-    }
-  });
-};
-let ytUseFallback = false, ytCurrentItem = null;
+// ── YouTube — usa apenas iframe direto ──────────────────────────
+let ytCurrentItem = null;
 
 // ── DOM ─────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -1635,6 +1614,7 @@ function playYT(item) {
   hideAllMedia();
   ytCurrentItem = item;
   el.ytWrap.style.display = 'block';
+
   var rot = Number(item.rotation) || 0;
   if (rot !== 0) {
     applyMediaRotation(rot, el.ytWrap);
@@ -1645,100 +1625,72 @@ function playYT(item) {
   var vid  = item.youtube_id;
   var list = item.youtube_list || null;
 
-  // YouTube SEMPRE começa mutado para garantir autoplay (política dos browsers)
-  // Depois de 1s tenta desmutar via postMessage
-  var origin = window.location.origin;
-
-  function buildEmbedUrl() {
-    var base = 'https://www.youtube.com/embed/';
-    // Sempre mute=1 para garantir autoplay — desmutamos via postMessage depois
-    var common = '?autoplay=1&mute=1&controls=1&rel=0&playsinline=1&modestbranding=1&iv_load_policy=3&enablejsapi=1&origin=' + encodeURIComponent(origin);
-    if (vid && list) {
-      return base + vid + common + '&list=' + list;
-    } else if (!vid && list) {
-      return base + 'videoseries' + common + '&list=' + list;
-    } else {
-      return base + vid + common + '&loop=1&playlist=' + vid;
-    }
+  function buildEmbedUrl(muted) {
+    var base  = 'https://www.youtube.com/embed/';
+    var muteP = muted ? '&mute=1' : '&mute=0';
+    var common = '?autoplay=1&controls=1&rel=0&playsinline=1&modestbranding=1' + muteP;
+    if (vid && list)  return base + vid  + common + '&list=' + list;
+    if (!vid && list) return base + 'videoseries' + common + '&list=' + list;
+    return base + vid + common + '&loop=1&playlist=' + vid;
   }
 
   var wrap = document.getElementById('youtube-player');
-  if (wrap) {
+  if (!wrap) return;
+  wrap.innerHTML = '';
+
+  // --- Overlay de play (necessário para primeiro clique no Chrome) ---
+  var overlay = document.getElementById('yt-play-overlay');
+
+  function createIframe(muted) {
     wrap.innerHTML = '';
     var ifr = document.createElement('iframe');
-    ifr.setAttribute('width','100%');
-    ifr.setAttribute('height','100%');
-    ifr.setAttribute('frameborder','0');
-    ifr.setAttribute('allow','autoplay; encrypted-media; fullscreen; picture-in-picture');
-    ifr.setAttribute('allowfullscreen','');
     ifr.style.cssText = 'width:100%;height:100%;border:none;display:block;background:#000;';
-    ifr.src = buildEmbedUrl();
+    ifr.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+    ifr.setAttribute('allowfullscreen', '');
+    ifr.src = buildEmbedUrl(muted);
     wrap.appendChild(ifr);
+    return ifr;
+  }
 
-    // Mostra overlay de play para contornar bloqueio de autoplay do Chrome
-    var overlay = document.getElementById('yt-play-overlay');
+  // Tenta autoplay sem mute primeiro (funciona se o usuário já interagiu com a página)
+  var ifr = createIframe(false);
+
+  // Se o iframe não tocar em 2s (autoplay bloqueado), mostra botão de play
+  var autoplayTimer = setTimeout(function() {
     if (overlay) {
       overlay.style.display = 'flex';
       overlay.onclick = function() {
         overlay.style.display = 'none';
-        // Recarrega o iframe com interação do usuário — agora o autoplay funciona
-        ifr.src = buildEmbedUrl();
+        // Cria novo iframe após clique do usuário — autoplay garantido
+        ifr = createIframe(false);
       };
-      // Remove overlay automaticamente após 800ms se o vídeo já iniciou
-      setTimeout(function() {
-        // Tenta verificar se o vídeo está tocando via postMessage
-        try { ifr.contentWindow.postMessage(JSON.stringify({event:'listening'}), '*'); } catch(e) {}
-      }, 500);
     }
+  }, 2000);
 
-    // Detecta erro de embedding bloqueado pelo YouTube
-    ifr.addEventListener('load', function() {
-      // Verifica se o iframe carregou conteúdo real após 3s
-      setTimeout(function() {
-        try {
-          // Tenta desmutar
-          ifr.contentWindow.postMessage(JSON.stringify({event:'command',func:'unMute',args:''}), '*');
-          ifr.contentWindow.postMessage(JSON.stringify({event:'command',func:'setVolume',args:[curVol||80]}), '*');
-        } catch(e) {}
-      }, 2000);
-    });
-
-    // Listener para erros do YouTube IFrame API
-    window.addEventListener('message', function onYTMsg(e) {
-      try {
-        var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-        // Estado 1 = playing — esconde overlay
-        if (data && data.event === 'infoDelivery' && data.info && data.info.playerState === 1) {
-          var ov = document.getElementById('yt-play-overlay');
-          if (ov) ov.style.display = 'none';
-        }
-        if (data && data.event === 'onError') {
-          var code = data.info;
-          // Códigos 100, 101, 150 = embedding não permitido
-          if (code === 100 || code === 101 || code === 150) {
-            window.removeEventListener('message', onYTMsg);
-            toast('⚠️ Este vídeo não permite incorporação. Use outro link.');
-            setTimeout(nextItem, 3000);
-          }
-        }
-      } catch(ex) {}
-    });
-
-    // Tenta desmutar após 2s
-    if (!isMuted) {
-      setTimeout(function() {
-        try {
-          ifr.contentWindow.postMessage(JSON.stringify({event:'command',func:'unMute',args:''}), '*');
-          ifr.contentWindow.postMessage(JSON.stringify({event:'command',func:'setVolume',args:[curVol||80]}), '*');
-        } catch(e) {}
-      }, 2000);
-    }
-
-    // Sem timer para YouTube — roda até acabar ou playlist terminar
-    // Só usa timer se display_duration for maior que 60s (configuração manual)
-    var dur = item.display_duration && item.display_duration > 60 ? item.display_duration * 1000 : 0;
-    if (dur > 0) { stopTimers(); imgTimer = setTimeout(function(){ stopTimers(); nextItem(); }, dur); }
+  // Detecta se o vídeo iniciou via mensagem do iframe
+  function onMsg(e) {
+    try {
+      var d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+      if (!d) return;
+      // playerState 1 = tocando
+      if (d.event === 'infoDelivery' && d.info && d.info.playerState === 1) {
+        clearTimeout(autoplayTimer);
+        if (overlay) overlay.style.display = 'none';
+      }
+      // Erro 2 = parâmetro inválido, 100/101/150 = embed bloqueado
+      if (d.event === 'onError') {
+        clearTimeout(autoplayTimer);
+        window.removeEventListener('message', onMsg);
+        toast('⚠️ Vídeo não disponível para incorporação.');
+        setTimeout(nextItem, 3000);
+      }
+    } catch(ex) {}
   }
+  window.addEventListener('message', onMsg);
+
+  // Timer só se display_duration > 60s
+  var dur = item.display_duration && item.display_duration > 60 ? item.display_duration * 1000 : 0;
+  if (dur > 0) { stopTimers(); imgTimer = setTimeout(function(){ window.removeEventListener('message', onMsg); nextItem(); }, dur); }
 }
 
 function playPdf(item) {
