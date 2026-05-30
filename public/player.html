@@ -1667,11 +1667,42 @@ function playYT(item) {
     ifr.src = buildEmbedUrl();
     wrap.appendChild(ifr);
 
-    // Tenta desmutar após 2s (quando o vídeo já iniciou)
+    // Detecta erro de embedding bloqueado pelo YouTube
+    ifr.addEventListener('load', function() {
+      // Verifica se o iframe carregou conteúdo real após 3s
+      setTimeout(function() {
+        try {
+          // Tenta desmutar
+          ifr.contentWindow.postMessage(JSON.stringify({event:'command',func:'unMute',args:''}), '*');
+          ifr.contentWindow.postMessage(JSON.stringify({event:'command',func:'setVolume',args:[curVol||80]}), '*');
+        } catch(e) {}
+      }, 2000);
+    });
+
+    // Listener para erros do YouTube IFrame API
+    window.addEventListener('message', function onYTMsg(e) {
+      try {
+        var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (data && data.event === 'infoDelivery' && data.info && data.info.playerState === -1) {
+          // Estado -1 = não iniciado = provavelmente bloqueado
+        }
+        if (data && data.event === 'onError') {
+          var code = data.info;
+          // Códigos 100, 101, 150 = embedding não permitido
+          if (code === 100 || code === 101 || code === 150) {
+            window.removeEventListener('message', onYTMsg);
+            toast('⚠️ Este vídeo não permite incorporação. Use outro link.');
+            setTimeout(nextItem, 3000);
+          }
+        }
+      } catch(ex) {}
+    });
+
+    // Tenta desmutar após 2s
     if (!isMuted) {
       setTimeout(function() {
         try {
-          ifr.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+          ifr.contentWindow.postMessage(JSON.stringify({event:'command',func:'unMute',args:''}), '*');
           ifr.contentWindow.postMessage(JSON.stringify({event:'command',func:'setVolume',args:[curVol||80]}), '*');
         } catch(e) {}
       }, 2000);
