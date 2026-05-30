@@ -1512,6 +1512,8 @@ function playVid(item) {
 
   el.video.volume = curVol / 100; el.video.muted = isMuted;
   el.video.src = window.location.origin + item.url;
+  el.video.onended = function() { stopTimers(); nextItem(); };
+  el.video.onerror = function() { console.warn('video error, skipping'); setTimeout(nextItem, 1000); };
 
   if (totalRot !== 0) {
     // Canvas path: esconde <video> desde o início para não aparecer deformado
@@ -1531,20 +1533,37 @@ function playVid(item) {
     el.video.onloadeddata = tryStartCanvas;
     el.video.oncanplay    = tryStartCanvas; // fallback para browsers que pulam loadeddata
 
+    el.video.muted = true; // Mute para garantir autoplay
     el.video.play().catch(function(e) {
       console.warn('playVid canvas play error:', e);
       setTimeout(nextItem, 2000);
     });
 
-    // Safety timeout: se 5s não disparou nenhum evento, avança
+    // Safety timeout: se 8s não disparou nenhum evento, avança
     setTimeout(function() {
       if (!canvasStarted) { console.warn('canvas timeout, skipping'); nextItem(); }
-    }, 5000);
+    }, 8000);
 
   } else {
     el.video.style.display = 'block';
-    el.video.play().catch(function(){ setTimeout(nextItem, 2000); });
     applyTransition(el.video);
+
+    // Tenta play normal; se bloqueado pelo browser, tenta mutado
+    el.video.play().then(function() {
+      // Tocando normalmente
+    }).catch(function() {
+      // Autoplay bloqueado — tenta com mute
+      el.video.muted = true;
+      el.video.play().then(function() {
+        // Tocando mutado — desmuta após 1s
+        setTimeout(function() {
+          if (!isMuted) el.video.muted = false;
+        }, 1000);
+      }).catch(function(e) {
+        console.warn('playVid failed:', e);
+        setTimeout(nextItem, 2000);
+      });
+    });
   }
 }
 
