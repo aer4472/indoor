@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!-- v1780154776 -->
 <html lang="pt-BR">
 <head>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -2063,13 +2063,17 @@ $('auth-btn').onclick = async () => {
   $('auth-btn').textContent = '▶ Conectar';
 };
 
-$('connect-btn').onclick = async()=>{
+// connect-btn não existe mais (PIN substitui o select de TV)
+var _connectBtn = $('connect-btn');
+if (_connectBtn) _connectBtn.onclick = async()=>{
   const sel=el.tvSelect; if(!sel.value){alert('Selecione uma TV');return;}
   cfg.tvId=sel.value; cfg.tvName=sel.options[sel.selectedIndex].dataset.name;
   saveCfg(); await startPlayer();
 };
-$('reset-btn').onclick = resetCfg;
-$('retry-btn').onclick = ()=>location.reload();
+var _resetBtn = $('reset-btn');
+if (_resetBtn) _resetBtn.onclick = resetCfg;
+var _retryBtn = $('retry-btn');
+if (_retryBtn) _retryBtn.onclick = ()=>location.reload();
 
 document.addEventListener('visibilitychange',()=>{
   if (!document.hidden && isPlaying) { try{navigator.wakeLock?.request('screen');}catch{} }
