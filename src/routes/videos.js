@@ -125,8 +125,8 @@ router.post('/youtube', async (req, res, next) => {
     const displayName = name && name.trim() ? name.trim() : `${typeLabel}: ${filename}`;
 
     await db.run(
-      `INSERT INTO videos (id, filename, original_name, size, mime_type, media_type)
-       VALUES (?, ?, ?, 0, ?, 'youtube')`,
+      `INSERT INTO videos (id, filename, original_name, size, mime_type, media_type, display_duration)
+       VALUES (?, ?, ?, 0, ?, 'youtube', 0)`,
       [id, filename, displayName, mimeType]
     );
 
