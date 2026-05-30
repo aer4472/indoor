@@ -8,9 +8,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#2563eb">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Indoor TV">
+  <meta name="apple-mobile-web-app-title" content="SmartVision Pro">
   <link rel="manifest" href="/manifest.json">
-  <title>Indoor TV — Painel</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png">
+  <title>SmartVision Pro — Painel</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -49,7 +52,7 @@
 <script type="text/babel">
 const {useState,useEffect,useRef,useCallback} = React;
 const API = window.location.origin+'/api';
-let TOKEN = localStorage.getItem('indoor_tv_token')||'';
+let TOKEN = localStorage.getItem('smartvision_token')||'';
 
 const api = {
   _f:(url,opts={})=>{const h={'Content-Type':'application/json',...(opts.headers||{})};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;return fetch(url,{...opts,headers:h});},
@@ -149,11 +152,11 @@ function StatCard({icon,label,value,sub,color='blue'}){
 // ── LOGIN ────────────────────────────────────────────────────────
 function LoginPage({onLogin}) {
   const [u,setU]=useState('admin');const [p,setP]=useState('');const [err,setErr]=useState('');const [loading,setLoading]=useState(false);
-  const submit=async()=>{setLoading(true);setErr('');const r=await api.login(u,p);if(r.token){TOKEN=r.token;localStorage.setItem('indoor_tv_token',r.token);onLogin(r.username);}else setErr(r.error||'Erro');setLoading(false);};
+  const submit=async()=>{setLoading(true);setErr('');const r=await api.login(u,p);if(r.token){TOKEN=r.token;localStorage.setItem('smartvision_token',r.token);onLogin(r.username);}else setErr(r.error||'Erro');setLoading(false);};
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-blue-900 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm fadein">
-        <div className="text-center mb-6"><div className="text-5xl mb-2">📺</div><h1 className="text-2xl font-bold">Indoor TV</h1><p className="text-gray-400 text-sm">v1.0</p></div>
+        <div className="text-center mb-6"><img src="/logo.png" alt="SmartVision Pro" style={{height:"80px",objectFit:"contain",marginBottom:"8px"}}/><p className="text-gray-400 text-xs tracking-widest uppercase mt-1">Sistema Indoor de TV Corporativa</p></div>
         {err&&<div className="bg-red-50 text-red-600 rounded-lg p-3 mb-4 text-sm">{err}</div>}
         <Lbl>Usuário</Lbl><Inp value={u} onChange={setU}/>
         <Lbl>Senha</Lbl><Inp value={p} onChange={setP} type="password"/>
@@ -164,7 +167,7 @@ function LoginPage({onLogin}) {
           <p className="text-xs font-semibold text-gray-600 mt-0.5">Eduardo Soluções Tecnológicas</p>
           <p className="text-xs text-gray-400 mt-0.5">📞 (91) 98819-6385</p>
           <p className="text-xs text-gray-400">📸 @eduardosolucoestec</p>
-          <p className="text-xs text-gray-300 mt-1">v1.0</p>
+          <p className="text-xs text-gray-300 mt-1">v2.0</p>
         </div>
       </div>
     </div>
@@ -190,7 +193,7 @@ function Sidebar({page,setPage,logout,username,reloadTVs,reloading,theme={}}){
   const bg    = theme.sidebarBg    || '#111827';
   const txt   = theme.sidebarText  || '#9ca3af';
   const act   = theme.sidebarActive|| '#2563eb';
-  const name  = theme.panelName    || 'Indoor TV';
+  const name  = theme.panelName    || 'SmartVision Pro';
   const logo  = theme.panelLogo    || '';
 
   return (
@@ -242,7 +245,7 @@ function Sidebar({page,setPage,logout,username,reloadTVs,reloading,theme={}}){
         </button>
         <div className="px-2 pt-2" style={{borderTop:'1px solid rgba(255,255,255,.05)'}}>
           <p className="text-center" style={{color:'rgba(255,255,255,.2)',fontSize:9,lineHeight:'1.6'}}>
-            v1.0 — Todos os direitos reservados<br/>
+            v2.0 — Todos os direitos reservados<br/>
             Eduardo Soluções Tecnológicas<br/>
             📞 91 98819-6385<br/>
             📸 @eduardosolucoestec
@@ -258,7 +261,7 @@ function MobileDrawer({page,setPage,logout,username,reloadTVs,reloading,theme={}
   const bg  = theme.sidebarBg    || '#111827';
   const txt = theme.sidebarText  || '#9ca3af';
   const act = theme.sidebarActive|| '#2563eb';
-  const name = theme.panelName   || 'Indoor TV';
+  const name = theme.panelName   || 'SmartVision Pro';
   const logo = theme.panelLogo   || '';
 
   const go=(id)=>{setPage(id);setOpen(false);};
@@ -322,7 +325,7 @@ function App(){
   const [reloading,setReloading]=useState(false);
   const [theme,setTheme]=useState({
     sidebarBg:'#111827', sidebarText:'#9ca3af', sidebarActive:'#2563eb',
-    accentColor:'#2563eb', panelName:'Indoor TV', panelLogo:'',
+    accentColor:'#2563eb', panelName:'SmartVision Pro', panelLogo:'/logo.png',
   });
   const sockRef=useRef(null);
 
@@ -374,7 +377,7 @@ function App(){
   },[loggedIn]);
   useEffect(()=>{if(!loggedIn)return;const t=setInterval(load,20000);return()=>clearInterval(t);},[loggedIn,load]);
 
-  const logout=()=>{TOKEN='';localStorage.removeItem('indoor_tv_token');setLoggedIn(false);};
+  const logout=()=>{TOKEN='';localStorage.removeItem('smartvision_token');setLoggedIn(false);};
   const onLogin=u=>{setLoggedIn(true);setUsername(u);};
 
   const reloadTVs=async(tvId=null)=>{
@@ -1026,6 +1029,8 @@ function PlaylistsPage({playlists,videos,onUpdate,showToast}){
   const [cardForm,setCardForm]=useState({});
   const [cardSaving,setCardSaving]=useState(false);
   const [tab,setTab]=useState('media'); // 'media' | 'cards'
+  const [mediaFilter, setMediaFilter] = React.useState('all');
+  const [mediaSearch, setMediaSearch] = React.useState('');
 
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [fbPath, setFbPath] = useState(null);
@@ -1186,16 +1191,39 @@ function PlaylistsPage({playlists,videos,onUpdate,showToast}){
           {/* Coluna esquerda — disponíveis (muda conforme tab) */}
           <div>
             {tab==='media' ? <>
-              <Lbl>Disponíveis ({normalMedia.filter(v=>!form.videoIds.includes(v.id)).length})</Lbl>
-              <div className="border border-gray-200 rounded-lg overflow-y-auto" style={{maxHeight:280}}>
-                {normalMedia.filter(v=>!form.videoIds.includes(v.id)).map(v=>(
+              <div className="flex gap-1 mb-2 flex-wrap">
+                {[
+                  {k:'all',   label:'Todos'},
+                  {k:'video', label:'🎬 Vídeos'},
+                  {k:'image', label:'🖼 Imagens'},
+                  {k:'youtube',label:'▶ YouTube'},
+                  {k:'audio', label:'🎵 Áudio'},
+                ].map(f=>(
+                  <button key={f.k} onClick={()=>setMediaFilter(f.k)}
+                    className={`px-2 py-0.5 rounded-full text-xs border transition ${mediaFilter===f.k?'bg-blue-600 text-white border-blue-600':'bg-white text-gray-500 border-gray-200 hover:border-blue-300'}`}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <input
+                value={mediaSearch} onChange={e=>setMediaSearch(e.target.value)}
+                placeholder="🔍 Buscar mídia..."
+                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs mb-2 outline-none focus:border-blue-400"
+              />
+              <div className="border border-gray-200 rounded-lg overflow-y-auto" style={{maxHeight:220}}>
+                {normalMedia
+                  .filter(v=>!form.videoIds.includes(v.id))
+                  .filter(v=>mediaFilter==='all'||v.media_type===mediaFilter||(mediaFilter==='youtube'&&v.media_type==='youtube'))
+                  .filter(v=>!mediaSearch||v.original_name.toLowerCase().includes(mediaSearch.toLowerCase()))
+                  .map(v=>(
                   <div key={v.id} onClick={()=>toggle(v.id)} className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 text-xs">
                     <span>{mediaIcon(v)}</span><span className="truncate flex-1">{v.original_name}</span>
-                    <span className="text-gray-400 flex-shrink-0">{v.media_type==='video'?`${v.duration||'?'}s`:v.media_type}</span>
-                    <span className="text-green-500 font-bold ml-1">+</span>
+                    <span className="text-gray-400 flex-shrink-0 mr-1">{v.media_type==='video'?`${v.duration||'?'}s`:v.media_type}</span>
+                    <span className="text-green-500 font-bold">+</span>
                   </div>
                 ))}
-                {normalMedia.filter(v=>!form.videoIds.includes(v.id)).length===0&&<p className="text-xs text-gray-400 text-center py-4">Todas adicionadas</p>}
+                {normalMedia.filter(v=>!form.videoIds.includes(v.id)).filter(v=>mediaFilter==='all'||v.media_type===mediaFilter).filter(v=>!mediaSearch||v.original_name.toLowerCase().includes(mediaSearch.toLowerCase())).length===0&&
+                  <p className="text-xs text-gray-400 text-center py-4">Nenhum resultado</p>}
               </div>
             </> : <>
               <Lbl>Criar novo card</Lbl>
@@ -1246,6 +1274,14 @@ function PlaylistsPage({playlists,videos,onUpdate,showToast}){
                     {['clock_card','weather_card','slide'].includes(v.media_type)&&
                       <button onClick={()=>openCard(v.media_type,v)} className="text-gray-400 hover:text-blue-600 flex-shrink-0" title="Editar card">✏️</button>
                     }
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 mr-1 ${
+                      v.media_type==='video'?'bg-blue-100 text-blue-600':
+                      v.media_type==='image'?'bg-green-100 text-green-600':
+                      v.media_type==='youtube'?'bg-red-100 text-red-600':
+                      v.media_type==='audio'?'bg-purple-100 text-purple-600':
+                      'bg-gray-100 text-gray-500'}`}>
+                      {v.media_type==='video'?'🎬':v.media_type==='image'?'🖼':v.media_type==='youtube'?'▶':v.media_type==='audio'?'🎵':'✨'}
+                    </span>
                     <span className="text-gray-400 text-xs flex-shrink-0 mr-1">{v.display_duration||10}s</span>
                     <button onClick={()=>toggle(id)} className="text-red-400 hover:text-red-600 ml-0.5 text-base leading-none">×</button>
                   </div>
@@ -2349,7 +2385,7 @@ function AppearancePage({theme,setTheme,showToast}){
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
       a.href=url;
-      a.download=`indoortv-backup-${new Date().toISOString().slice(0,10)}.json`;
+      a.download=`smartvision-backup-${new Date().toISOString().slice(0,10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       showToast('✅ Backup baixado com sucesso!');
@@ -2410,7 +2446,7 @@ function AppearancePage({theme,setTheme,showToast}){
           ? <img src={form.panelLogo} alt="Logo" style={{height:28,maxWidth:110,objectFit:'contain',borderRadius:3}}/>
           : <div style={{display:'flex',alignItems:'center',gap:6}}>
               <span style={{fontSize:20}}>📺</span>
-              <span style={{fontWeight:700,fontSize:12,color:'#fff'}}>{form.panelName||'Indoor TV'}</span>
+              <span style={{fontWeight:700,fontSize:12,color:'#fff'}}>{form.panelName||'SmartVision Pro'}</span>
             </div>
         }
         <p style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2}}>admin</p>
@@ -2460,7 +2496,7 @@ function AppearancePage({theme,setTheme,showToast}){
               ? <button onClick={removeLogo} className="w-full text-xs text-red-500 border border-red-200 rounded-lg py-1.5 hover:bg-red-50 transition">🗑 Remover logo</button>
               : <>
                   <Lbl>Nome exibido (sem logo)</Lbl>
-                  <Inp value={form.panelName||''} onChange={v=>set('panelName',v)} placeholder="Indoor TV"/>
+                  <Inp value={form.panelName||''} onChange={v=>set('panelName',v)} placeholder="SmartVision Pro"/>
                 </>
             }
           </div>

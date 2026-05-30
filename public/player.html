@@ -6,7 +6,8 @@
   <meta http-equiv="Expires" content="0">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Indoor TV Player</title>
+  <title>SmartVision Pro — Player</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <style>
     *{margin:0;padding:0;box-sizing:border-box;}
@@ -215,7 +216,7 @@
 <script>
 // FIX IMEDIATO - roda antes de tudo
 (function(){
-  var s=null;try{s=JSON.parse(localStorage.getItem('indoorTvCfg')||'{}');}catch(e){}
+  var s=null;try{s=JSON.parse(localStorage.getItem('smartVisionCfg')||'{}');}catch(e){}
   if(!s||!s.tvId){
     document.addEventListener('DOMContentLoaded',function(){
       var ov=document.getElementById('overlay');
@@ -232,12 +233,15 @@
 })();
 </script>
 <div id="stage">
+  <div id="sv-watermark" style="position:fixed;bottom:14px;right:14px;z-index:900;opacity:0.18;pointer-events:none;transition:opacity .3s;">
+    <img src="/logo.png" alt="SmartVision Pro" style="height:36px;object-fit:contain;filter:brightness(10);">
+  </div>
 
 <!-- Setup -->
 <div id="overlay" class="overlay">
   <div class="box">
     <div style="font-size:40px;margin-bottom:12px">📺</div>
-    <h1>Indoor TV Player</h1>
+    <h1>SmartVision Pro</h1>
     <p id="overlay-msg">Inicializando...</p>
     <div id="spinner" class="spinner"></div>
     <div id="setup-form" class="hidden">
@@ -308,7 +312,7 @@
 // BOOT RÁPIDO: mostra PIN assim que o DOM carrega, sem esperar nada
 document.addEventListener('DOMContentLoaded', function() {
   var saved = null;
-  try { saved = JSON.parse(localStorage.getItem('indoorTvCfg')||'{}'); } catch(e) {}
+  try { saved = JSON.parse(localStorage.getItem('smartVisionCfg')||'{}'); } catch(e) {}
   if (!saved || !saved.tvId) {
     var overlay = document.getElementById('overlay');
     var msg = document.getElementById('overlay-msg');
@@ -1951,10 +1955,10 @@ async function startPlayer() {
   }
 }
 
-function loadCfg() { try { const s=localStorage.getItem('indoorTvCfg'); if(s) cfg=JSON.parse(s); } catch {} }
-function saveCfg() { localStorage.setItem('indoorTvCfg',JSON.stringify(cfg)); }
+function loadCfg() { try { const s=localStorage.getItem('smartVisionCfg'); if(s) cfg=JSON.parse(s); } catch {} }
+function saveCfg() { localStorage.setItem('smartVisionCfg',JSON.stringify(cfg)); }
 function resetCfg() {
-  localStorage.removeItem('indoorTvCfg'); cfg={tvId:null,tvName:null};
+  localStorage.removeItem('smartVisionCfg'); cfg={tvId:null,tvName:null};
   clearInterval(syncTimer); clearInterval(hbTimer); clearInterval(wTimer);
   stopTimers(); stopSiren();
   if (socket) socket.disconnect(); init();
@@ -1963,7 +1967,7 @@ function resetCfg() {
 async function init() {
   // ?reset=1 na URL limpa config salva
   if (new URLSearchParams(window.location.search).get('reset') === '1') {
-    localStorage.removeItem('indoorTvCfg');
+    localStorage.removeItem('smartVisionCfg');
     history.replaceState(null, '', window.location.pathname);
   }
   loadCfg();
