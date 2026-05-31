@@ -1135,20 +1135,82 @@ body.has-banner #hero { padding-top:152px; }
 <!-- FOOTER -->
 <footer style="position:relative;z-index:1;background:var(--dark2)">
   <div class="footer-inner">
-    <div class="footer-top">
+
+    <!-- Top grid -->
+    <div class="footer-top" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:48px;margin-bottom:44px;padding-top:56px">
+
+      <!-- Brand -->
       <div>
-        <a href="#"><img src="/logo.png" alt="SmartVision Pro" style="height:30px;object-fit:contain;display:block;margin-bottom:14px"></a>
-        <p class="footer-brand p" style="font-size:13.5px;color:var(--text2);line-height:1.7;max-width:240px;margin-bottom:20px">Sistema Indoor de TV Corporativa. Tecnologia para comunicação empresarial moderna.</p>
-        <a href="https://wa.me/5591988196385" target="_blank" class="footer-wa">📱 WhatsApp</a>
+        <!-- SmartVision Pro logo -->
+        <a href="#" style="display:block;margin-bottom:8px">
+          <img src="/logo.png" alt="SmartVision Pro" style="height:30px;object-fit:contain">
+        </a>
+        <p style="font-size:13px;color:var(--text2);line-height:1.7;max-width:240px;margin:0 0 20px">
+          Sistema Indoor de TV Corporativa.<br>Gerencie toda comunicação visual da sua empresa em tempo real.
+        </p>
+        <!-- Developed by -->
+        <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">
+          <p style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Desenvolvido por</p>
+          <div style="display:flex;align-items:center;gap:10px">
+            <img src="/logo-eduardo.png" alt="Eduardo Soluções Tec" style="height:40px;object-fit:contain;border-radius:6px;background:#fff;padding:3px">
+            <div>
+              <div style="font-size:12.5px;font-weight:700;color:var(--text)">Eduardo Soluções Tecnológicas</div>
+              <div style="font-size:11px;color:var(--text3)">Bragança — PA · CNPJ 65.854.298/0001-42</div>
+              <div style="font-size:11px;color:var(--text3);font-style:italic;margin-top:2px">Tecnologia que conecta. Suporte que resolve.</div>
+            </div>
+          </div>
+        </div>
+        <!-- WhatsApp -->
+        <a href="https://wa.me/5591988196385" target="_blank"
+          style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;background:rgba(37,211,102,.08);border:1px solid rgba(37,211,102,.2);color:#25D366;border-radius:9px;font-size:13px;font-weight:700;text-decoration:none;margin-top:16px;transition:background .2s"
+          onmouseover="this.style.background='rgba(37,211,102,.15)'" onmouseout="this.style.background='rgba(37,211,102,.08)'">
+          📱 (91) 98819-6385
+        </a>
       </div>
-      <div class="fc"><h4>Plataforma</h4><a href="#software">Software</a><a href="#vantagens">Vantagens</a><a href="#segmentos">Onde usar</a><a href="/painel.html">Área do cliente</a></div>
-      <div class="fc"><h4>Empresa</h4><a href="#contato">Sobre nós</a><a href="#planos">Planos</a><a href="#contato">Suporte</a></div>
-      <div class="fc"><h4>Legal</h4><a href="#">Termos de uso</a><a href="#">Privacidade</a><a href="#">Cookies</a></div>
+
+      <!-- Plataforma -->
+      <div class="fc">
+        <h4 style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:14px">Plataforma</h4>
+        <a href="#software"   style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Software</a>
+        <a href="#vantagens"  style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Vantagens</a>
+        <a href="#segmentos"  style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Onde usar</a>
+        <a href="#planos"     style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Planos</a>
+        <a href="/painel.html" style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Área do cliente</a>
+      </div>
+
+      <!-- Empresa -->
+      <div class="fc">
+        <h4 style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:14px">Empresa</h4>
+        <a href="/sobre.html"  style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Sobre nós</a>
+        <a href="#planos"      style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Planos</a>
+        <a href="#contato"     style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Suporte</a>
+        <a href="#contato"     style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Contato</a>
+        <a href="https://instagram.com/eduardosolucoestec" target="_blank" style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Instagram</a>
+      </div>
+
+      <!-- Legal -->
+      <div class="fc">
+        <h4 style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:14px">Legal</h4>
+        <a href="/termos.html"     style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Termos de uso</a>
+        <a href="/privacidade.html" style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Privacidade</a>
+        <a href="/cookies.html"    style="display:block;font-size:13.5px;color:var(--text2);margin-bottom:9px;text-decoration:none;transition:color .2s" onmouseover="this.style.color='#60A5FA'" onmouseout="this.style.color='#94A3B8'">Cookies</a>
+      </div>
+
     </div>
-    <div class="footer-bottom">
-      <div class="fcopy">© 2026 Eduardo Soluções Tecnológicas · SmartVision Pro. Todos os direitos reservados.</div>
-      <div class="flinks"><a href="https://instagram.com/eduardosolucoestec">Instagram</a><a href="https://wa.me/5591988196385">WhatsApp</a></div>
+
+    <!-- Bottom bar -->
+    <div style="border-top:1px solid var(--border);padding-top:22px;padding-bottom:28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+      <div style="font-size:12px;color:var(--text3)">
+        © 2026 Eduardo Soluções Tecnológicas · CNPJ 65.854.298/0001-42 · Bragança, PA
+      </div>
+      <div style="display:flex;gap:18px;align-items:center">
+        <a href="https://instagram.com/eduardosolucoestec" target="_blank" style="font-size:12px;color:var(--text3);text-decoration:none;transition:color .2s" onmouseover="this.style.color='#94A3B8'" onmouseout="this.style.color='#475569'">Instagram</a>
+        <a href="https://wa.me/5591988196385" target="_blank" style="font-size:12px;color:var(--text3);text-decoration:none;transition:color .2s" onmouseover="this.style.color='#94A3B8'" onmouseout="this.style.color='#475569'">WhatsApp</a>
+        <a href="/termos.html" style="font-size:12px;color:var(--text3);text-decoration:none;transition:color .2s" onmouseover="this.style.color='#94A3B8'" onmouseout="this.style.color='#475569'">Termos</a>
+        <a href="/privacidade.html" style="font-size:12px;color:var(--text3);text-decoration:none;transition:color .2s" onmouseover="this.style.color='#94A3B8'" onmouseout="this.style.color='#475569'">Privacidade</a>
+      </div>
     </div>
+
   </div>
 </footer>
 

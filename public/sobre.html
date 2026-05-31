@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Sobre Nós — Eduardo Soluções Tecnológicas</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Plus Jakarta Sans",sans-serif;background:#0A0E1A;color:#F1F5F9;line-height:1.7;-webkit-font-smoothing:antialiased}
+.wrap{max-width:820px;margin:0 auto;padding:100px 5% 80px}
+nav{position:fixed;top:0;left:0;right:0;height:60px;background:rgba(10,14,26,.95);backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;padding:0 5%;gap:16px;z-index:100}
+nav img{height:26px;object-fit:contain}
+.nav-home{font-size:13px;color:#94A3B8;text-decoration:none;margin-left:auto;transition:color .2s}
+.nav-home:hover{color:#F1F5F9}
+.nav-cta{font-size:13px;color:#fff;text-decoration:none;padding:7px 16px;background:#2563EB;border-radius:8px;font-weight:600;box-shadow:0 2px 12px rgba(37,99,235,.4)}
+h1{font-size:clamp(30px,4vw,48px);font-weight:800;letter-spacing:-.025em;margin-bottom:8px}
+.subtitle{font-size:17px;color:#94A3B8;margin-bottom:40px;font-style:italic}
+h2{font-size:20px;font-weight:700;margin:36px 0 12px;color:#E2E8F0;display:flex;align-items:center;gap:8px}
+h2::before{content:'';width:3px;height:20px;background:#2563EB;border-radius:2px;display:inline-block}
+p{font-size:15px;color:#94A3B8;margin-bottom:14px}
+ul{padding-left:0;margin-bottom:14px;list-style:none}
+li{font-size:15px;color:#94A3B8;margin-bottom:8px;padding-left:20px;position:relative}
+li::before{content:'✓';position:absolute;left:0;color:#10B981;font-weight:700;font-size:13px}
+strong{color:#CBD5E1;font-weight:600}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0}
+.info-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:20px}
+.info-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#475569;margin-bottom:6px}
+.info-val{font-size:15px;font-weight:600;color:#E2E8F0}
+footer{text-align:center;padding:32px 5%;font-size:12px;color:#334155;border-top:1px solid rgba(255,255,255,.06);margin-top:60px}
+@media(max-width:600px){.info-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/"><img src="/logo.png" alt="SmartVision Pro"></a>
+  <a href="/" class="nav-home">← Voltar ao site</a>
+  <a href="/painel.html" class="nav-cta">Área do Cliente</a>
+</nav>
+
+<div class="wrap">
+  <a href="/" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#3B82F6;text-decoration:none;margin-bottom:32px">← Voltar ao site</a>
+
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+    <img src="/logo-eduardo.png" alt="Eduardo Soluções Tec" style="height:60px;object-fit:contain;background:#fff;border-radius:10px;padding:4px">
+    <div>
+      <h1>Eduardo Soluções<br>Tecnológicas</h1>
+      <div class="subtitle">Tecnologia que conecta. Suporte que resolve.</div>
+    </div>
+  </div>
+
+  <h2>Quem somos</h2>
+  <p>A <strong>Eduardo Soluções Tecnológicas</strong> é uma empresa especializada em desenvolvimento de software, sistemas corporativos e soluções tecnológicas para empresas de todos os tamanhos. Sediada em <strong>Bragança, Pará</strong>, atendemos clientes em todo o Brasil com soluções digitais modernas e eficientes.</p>
+  <p>Nossa missão é simplificar a tecnologia para que empresas possam focar no que realmente importa — seu negócio. Oferecemos suporte técnico ágil, desenvolvimento personalizado e sistemas prontos para uso imediato.</p>
+
+  <h2>SmartVision Pro</h2>
+  <p>O <strong>SmartVision Pro</strong> é o nosso principal produto — um sistema SaaS de gestão de TV corporativa (Digital Signage) que permite às empresas gerenciar o conteúdo exibido em todas as suas telas de forma remota, em tempo real, sem necessidade de deslocamento.</p>
+
+  <ul>
+    <li>Controle remoto de TVs corporativas via navegador web</li>
+    <li>Playlists inteligentes com vídeos, imagens, YouTube e widgets</li>
+    <li>Agendamento de conteúdo por dia e horário</li>
+    <li>Monitoramento em tempo real com WebSocket</li>
+    <li>Multi-empresa com isolamento total de dados</li>
+    <li>Suporte técnico via WhatsApp com atendimento ágil</li>
+  </ul>
+
+  <h2>Informações da empresa</h2>
+  <div class="info-grid">
+    <div class="info-card">
+      <div class="info-label">Razão Social</div>
+      <div class="info-val">Eduardo Soluções Tecnológicas</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">CNPJ</div>
+      <div class="info-val">65.854.298/0001-42</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Cidade / Estado</div>
+      <div class="info-val">Bragança — PA</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Segmento</div>
+      <div class="info-val">Tecnologia da Informação</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">WhatsApp</div>
+      <div class="info-val">(91) 98819-6385</div>
+    </div>
+    <div class="info-card">
+      <div class="info-label">Instagram</div>
+      <div class="info-val">@eduardosolucoestec</div>
+    </div>
+  </div>
+
+  <h2>Suporte</h2>
+  <p>Atendemos via <strong>WhatsApp</strong> e <strong>e-mail</strong>. Nosso time de suporte está disponível de segunda a sexta, das 8h às 18h. Para emergências, o atendimento pode ser solicitado fora do horário comercial via WhatsApp.</p>
+  <p>
+    📱 <a href="https://wa.me/5591988196385" style="color:#25D366;font-weight:600">(91) 98819-6385</a><br>
+    ✉️ <a href="mailto:contato@smartvisionpro.com.br" style="color:#3B82F6">contato@smartvisionpro.com.br</a>
+  </p>
+</div>
+
+<footer>© 2026 Eduardo Soluções Tecnológicas · CNPJ 65.854.298/0001-42 · Bragança, PA</footer>
+</body>
+</html>
