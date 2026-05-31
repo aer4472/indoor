@@ -201,9 +201,10 @@ tr:hover td { background:var(--bg3); }
 /* ── MODAL ── */
 .sv-modal-backdrop {
   position:fixed;inset:0;z-index:9000;
-  background:rgba(15,23,42,.55);
+  background:rgba(15,23,42,.5);
   backdrop-filter:blur(4px);
-  display:flex;align-items:center;justify-content:center;padding:16px;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:24px 16px;
   animation:fadein .18s ease;
   overflow-y:auto;
 }
@@ -211,19 +212,31 @@ tr:hover td { background:var(--bg3); }
   background:#FFFFFF;
   border:1px solid #E2E8F0;
   border-radius:16px;
-  box-shadow:0 20px 60px rgba(0,0,0,.15),0 4px 16px rgba(0,0,0,.08);
+  box-shadow:0 20px 60px rgba(0,0,0,.18),0 4px 16px rgba(0,0,0,.08);
   width:100%;max-width:560px;
-  max-height:88vh;
   display:flex;flex-direction:column;
   margin:auto;
   position:relative;
+  max-height:calc(100vh - 48px);
 }
 .sv-modal.wide { max-width:920px; }
 .sv-modal.xl   { max-width:1100px; }
-.sv-modal-header { display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;flex-shrink:0; }
+.sv-modal-header { 
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 22px 14px;
+  border-bottom:1px solid #E2E8F0;
+  flex-shrink:0;
+  position:sticky;top:0;background:#fff;z-index:2;border-radius:16px 16px 0 0;
+}
 .sv-modal-title  { font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;color:#1E293B; }
-.sv-modal-body   { padding:20px 24px;overflow-y:auto;flex:1;min-height:0; }
-.sv-modal-footer { padding:16px 24px;border-top:1px solid #E2E8F0;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0; }
+.sv-modal-body   { padding:18px 22px;overflow-y:auto;flex:1; }
+.sv-modal-footer { 
+  padding:14px 22px;
+  border-top:1px solid #E2E8F0;
+  display:flex;gap:8px;justify-content:flex-end;
+  flex-shrink:0;
+  position:sticky;bottom:0;background:#fff;z-index:2;border-radius:0 0 16px 16px;
+}
 
 /* ── NAV ACTIVE ── */
 .nav-active-indicator {
@@ -1941,9 +1954,9 @@ function PlaylistsPage({playlists,videos,onUpdate,showToast}){
               <input
                 value={mediaSearch} onChange={e=>setMediaSearch(e.target.value)}
                 placeholder="🔍 Buscar mídia..."
-                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs mb-2 outline-none focus:border-blue-400"
+                style={{width:"100%",padding:"7px 10px",borderRadius:8,border:"1px solid #CBD5E1",fontSize:12,marginBottom:8,outline:"none",fontFamily:"'Inter',sans-serif"}}
               />
-              <div className="border border-gray-200 rounded-lg overflow-y-auto" style={{maxHeight:220}}>
+              <div className="border border-gray-200 rounded-lg overflow-y-auto" style={{maxHeight:"calc(100vh - 420px)",minHeight:160}}>
                 {normalMedia
                   .filter(v=>!form.videoIds.includes(v.id))
                   .filter(v=>mediaFilter==='all'||v.media_type===mediaFilter||(mediaFilter==='youtube'&&v.media_type==='youtube'))
@@ -1992,7 +2005,7 @@ function PlaylistsPage({playlists,videos,onUpdate,showToast}){
           {/* Coluna direita — na playlist (sempre visível) */}
           <div>
             <Lbl>Na playlist ({form.videoIds.length}) — arraste para reordenar</Lbl>
-            <div className="border border-gray-200 rounded-lg overflow-y-auto min-h-12" style={{maxHeight:280}}>
+            <div className="border border-gray-200 rounded-lg overflow-y-auto min-h-12" style={{maxHeight:"calc(100vh - 420px)",minHeight:160}}>
               {form.videoIds.length===0&&<p className="text-xs text-gray-400 text-center py-4">Vazia — adicione itens</p>}
               {form.videoIds.map((id,i)=>{
                 const v=getV(id);if(!v)return null;
