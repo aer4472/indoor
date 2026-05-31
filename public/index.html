@@ -200,42 +200,53 @@ tr:hover td { background:var(--bg3); }
 
 /* ── MODAL ── */
 .sv-modal-backdrop {
-  position:fixed;inset:0;z-index:9000;
-  background:rgba(15,23,42,.5);
+  position:fixed;
+  top:0;left:0;right:0;bottom:0;
+  z-index:99999;
+  background:rgba(15,23,42,.55);
   backdrop-filter:blur(4px);
-  display:flex;align-items:flex-start;justify-content:center;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   padding:24px 16px;
-  animation:fadein .18s ease;
   overflow-y:auto;
+  animation:fadein .15s ease;
 }
 .sv-modal {
   background:#FFFFFF;
   border:1px solid #E2E8F0;
   border-radius:16px;
-  box-shadow:0 20px 60px rgba(0,0,0,.18),0 4px 16px rgba(0,0,0,.08);
-  width:100%;max-width:560px;
-  display:flex;flex-direction:column;
-  margin:auto;
+  box-shadow:0 24px 64px rgba(0,0,0,.2),0 4px 16px rgba(0,0,0,.08);
+  width:100%;
+  max-width:560px;
+  max-height:90vh;
+  display:flex;
+  flex-direction:column;
   position:relative;
-  max-height:calc(100vh - 48px);
+  margin:auto;
+  flex-shrink:0;
 }
 .sv-modal.wide { max-width:920px; }
 .sv-modal.xl   { max-width:1100px; }
-.sv-modal-header { 
+.sv-modal-header {
   display:flex;align-items:center;justify-content:space-between;
   padding:18px 22px 14px;
   border-bottom:1px solid #E2E8F0;
   flex-shrink:0;
-  position:sticky;top:0;background:#fff;z-index:2;border-radius:16px 16px 0 0;
+  border-radius:16px 16px 0 0;
+  background:#fff;
+  position:sticky;top:0;z-index:1;
 }
-.sv-modal-title  { font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;color:#1E293B; }
-.sv-modal-body   { padding:18px 22px;overflow-y:auto;flex:1; }
-.sv-modal-footer { 
+.sv-modal-title { font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;color:#1E293B; }
+.sv-modal-body  { padding:18px 22px;overflow-y:auto;flex:1;min-height:0; }
+.sv-modal-footer {
   padding:14px 22px;
   border-top:1px solid #E2E8F0;
   display:flex;gap:8px;justify-content:flex-end;
   flex-shrink:0;
-  position:sticky;bottom:0;background:#fff;z-index:2;border-radius:0 0 16px 16px;
+  border-radius:0 0 16px 16px;
+  background:#fff;
+  position:sticky;bottom:0;z-index:1;
 }
 
 /* ── NAV ACTIVE ── */
@@ -329,6 +340,7 @@ tr:hover td { background:var(--bg3); }
 </head>
 <body style="background:var(--bg)">
 <div id="root"></div>
+<div id="modal-root" style="position:relative;z-index:99999"></div>
 <script type="text/babel">
 const {useState,useEffect,useRef,useCallback} = React;
 const API = window.location.origin+'/api';
@@ -400,22 +412,28 @@ const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
 // ── HELPERS ──────────────────────────────────────────────────────
 function Modal({title,onClose,onSave,children,wide,xl,saveLabel='Salvar',saveDanger=false,saving}) {
-  return (
+  const modalRoot = document.getElementById('modal-root') || document.body;
+
+  React.useEffect(()=>{
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return ()=>{ document.body.style.overflow = prev; };
+  },[]);
+
+  const modal = (
     <div className="sv-modal-backdrop" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className={`sv-modal fadein${wide?' wide':xl?' wide xl':''}` } style={xl?{maxWidth:1100}:{}}>
+      <div className={`sv-modal fadein${wide?' wide':xl?' wide xl':''}`} style={xl?{maxWidth:1100}:{}} onClick={e=>e.stopPropagation()}>
         <div className="sv-modal-header">
           <div className="sv-modal-title">{title}</div>
-          <button onClick={onClose} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',color:'#64748B',width:30,height:30,borderRadius:8,cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',transition:'all .2s'}}
+          <button onClick={onClose} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',color:'#64748B',width:30,height:30,borderRadius:8,cursor:'pointer',fontSize:15,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}
             onMouseEnter={e=>{e.currentTarget.style.background='#FEF2F2';e.currentTarget.style.color='#DC2626';}}
-            onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#64748B';}}>
-            ✕
-          </button>
+            onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#64748B';}}>✕</button>
         </div>
         <div className="sv-modal-body">{children}</div>
         {onSave&&(
           <div className="sv-modal-footer">
             <button className="btn-sec" onClick={onClose}>Cancelar</button>
-            <button className={saveDanger?"btn-primary":"btn-primary"} onClick={onSave} disabled={saving}
+            <button className="btn-primary" onClick={onSave} disabled={saving}
               style={saveDanger?{background:'linear-gradient(135deg,#dc2626,#ef4444)'}:{}}>
               {saving?'Salvando...':saveLabel}
             </button>
@@ -424,6 +442,7 @@ function Modal({title,onClose,onSave,children,wide,xl,saveLabel='Salvar',saveDan
       </div>
     </div>
   );
+  return ReactDOM.createPortal(modal, modalRoot);
 }
 
 
