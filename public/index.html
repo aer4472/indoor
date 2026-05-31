@@ -363,6 +363,11 @@ const api = {
   deleteSponsorLogo:(gid,lid)=>api._f(`${API}/sponsors/groups/${gid}/logos/${lid}`,{method:'DELETE'}).then(r=>r.json()),
   reorderSponsorLogos:(gid,ids)=>api._f(`${API}/sponsors/groups/${gid}/order`,{method:'PUT',body:JSON.stringify({ids})}).then(r=>r.json()),
   uploadLogo:(file,type)=>{const fd=new FormData();fd.append('logo',file);fd.append('type',type||'sponsor');const h={};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;return fetch(`${API}/settings/logo`,{method:'POST',headers:h,body:fd}).then(r=>r.json());},
+  getPlans:()=>api._f(`${API}/plans`).then(r=>r.json()),
+  createPlan:d=>api._f(`${API}/plans`,{method:'POST',body:JSON.stringify(d)}).then(r=>r.json()),
+  updatePlan:(id,d)=>api._f(`${API}/plans/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
+  deletePlan:id=>api._f(`${API}/plans/${id}`,{method:'DELETE'}).then(r=>r.json()),
+  getMe:()=>api._f(`${API}/users/me`).then(r=>r.json()),
   getReportStatus:()=>api._f(`${API}/reports/status`).then(r=>r.json()),
   getReportStats:()=>api._f(`${API}/reports/stats`).then(r=>r.json()),
   getReportPlayback:(tvId,days)=>api._f(`${API}/reports/playback?${tvId?`tv_id=${tvId}&`:''}days=${days||1}&limit=100`).then(r=>r.json()),
@@ -607,6 +612,7 @@ function Sidebar({page,setPage,logout,username,reloadTVs,reloading,tvs=[]}){
       {id:'emergency',icon:'⚡',label:'Emergência'},
     ]},
     {label:'Sistema',items:[
+      {id:'plans',icon:'◈',label:'Planos'},
       {id:'reports',icon:'↗',label:'Relatórios'},
       {id:'users',icon:'◎',label:'Usuários'},
       {id:'settings',icon:'⚙',label:'Aparência'},
@@ -814,7 +820,7 @@ function App(){
   if(!loggedIn) return <LoginPage onLogin={onLogin}/>;
 
   const props={...data,onUpdate:load,showToast,reloadTVs,theme,setTheme,loadSettings};
-  const PAGE_LABELS={'dashboard':'Dashboard','tvs':'TVs','videos':'Mídias','playlists':'Playlists','schedules':'Agendamentos','widgets':'Widgets','emergency':'Emergência','sponsors':'Patrocinadores','reports':'Relatórios','users':'Usuários','settings':'Aparência'};
+  const PAGE_LABELS={'dashboard':'Dashboard','tvs':'TVs','videos':'Mídias','playlists':'Playlists','schedules':'Agendamentos','widgets':'Widgets','emergency':'Emergência','sponsors':'Patrocinadores','reports':'Relatórios','users':'Usuários','plans':'Planos de Uso','settings':'Aparência'};
   const onlineTvs=(data.tvs||[]).filter(t=>t.status==='online').length;
 
   return (
@@ -856,6 +862,7 @@ function App(){
           {page==='sponsors'   && <SponsorsPage   {...props}/>}
           {page==='reports'    && <ReportsPage    {...props}/>}
           {page==='users'      && <UsersPage      {...props}/>}
+          {page==='plans'      && <PlansPage      {...props}/>}
           {page==='settings'   && <AppearancePage {...props}/>}
         </div>
       </div>
@@ -1073,7 +1080,13 @@ function TVsPage({tvs,playlists,onUpdate,showToast,reloadTVs}){
     setForm(tv?{name:tv.name,orientation:tv.orientation||'horizontal',playlist_id:tv.playlist_id||'',volume:tv.volume??100,transition:tv.transition||'fade'}:{name:'',orientation:'horizontal',playlist_id:'',volume:100,transition:'fade'});
     setModal(true);
   };
-  const save=async()=>{if(!form.name.trim())return;edit?await api.updateTV(edit.id,form):await api.createTV(form);setModal(false);onUpdate();showToast(edit?'TV atualizada!':'TV criada!');};
+  const save=async()=>{if(!form.name.trim())return;const r=edit?await api.updateTV(edit.id,form):await api.createTV(form);
+    if(r&&r.error){
+      if(r.upgrade) showToast(`Limite de TVs atingido (${r.limit} TVs). Solicite upgrade ao administrador.`,'error');
+      else showToast(r.error,'error');
+      return;
+    }
+    setModal(false);onUpdate();showToast(edit?'TV atualizada!':'TV criada!');};
   const del=async id=>{if(!confirm('Remover TV?'))return;await api.deleteTV(id);onUpdate();showToast('Removida');};
   const getPl=pid=>playlists.find(p=>p.id===pid)?.name||'—';
   const playerUrl=id=>`${window.location.origin}/player.html`;
@@ -2874,63 +2887,327 @@ function ReportsPage({tvs}){
   );
 }
 
-// ── USUÁRIOS ─────────────────────────────────────────────────────
-function UsersPage({showToast}){
-  const [users,setUsers]=useState([]);
-  const [modal,setModal]=useState(false);const [edit,setEdit]=useState(null);
-  const [form,setForm]=useState({username:'',password:'',role:'operator'});
-  const load=async()=>{const r=await api.getUsers();Array.isArray(r)&&setUsers(r);};
+// ── PLANOS ───────────────────────────────────────────────────────
+function PlansPage({showToast}){
+  const [plans,setPlans]=useState([]);
+  const [modal,setModal]=useState(false);
+  const [edit,setEdit]=useState(null);
+  const [form,setForm]=useState({name:'',max_tvs:3,description:''});
+  const [saving,setSaving]=useState(false);
+
+  const load=async()=>{const r=await api.getPlans();Array.isArray(r)&&setPlans(r);};
   useEffect(()=>{load();},[]);
-  const open=(u=null)=>{setEdit(u);setForm(u?{username:u.username,password:'',role:u.role}:{username:'',password:'',role:'operator'});setModal(true);};
-  const save=async()=>{
-    if(!form.username.trim())return;
-    if(!edit&&!form.password.trim()){showToast('Senha obrigatória','error');return;}
-    const d={username:form.username,role:form.role};
-    if(form.password)d.password=form.password;
-    const r=edit?await api.updateUser(edit.id,d):await api.createUser(d);
-    if(r.error){showToast(r.error,'error');return;}
-    setModal(false);load();showToast(edit?'Usuário atualizado!':'Usuário criado!');
+
+  const open=(p=null)=>{
+    setEdit(p);
+    setForm(p?{name:p.name,max_tvs:p.max_tvs,description:p.description||''}:{name:'',max_tvs:3,description:''});
+    setModal(true);
   };
-  const del=async u=>{if(!confirm(`Remover ${u.username}?`))return;await api.deleteUser(u.id);load();showToast('Removido');};
-  const roleColor={admin:'bg-red-100 text-red-700',operator:'bg-blue-100 text-blue-700',viewer:'bg-gray-100 text-gray-700'};
-  const roleLabel={admin:'Admin',operator:'Operador',viewer:'Visualizador'};
+
+  const save=async()=>{
+    if(!form.name.trim()){showToast('Nome do plano obrigatório','error');return;}
+    setSaving(true);
+    const d={name:form.name.trim(),max_tvs:parseInt(form.max_tvs)||3,description:form.description};
+    const r=edit?await api.updatePlan(edit.id,d):await api.createPlan(d);
+    setSaving(false);
+    if(r.error){showToast(r.error,'error');return;}
+    setModal(false);load();showToast(edit?'Plano atualizado!':'Plano criado!');
+  };
+
+  const del=async p=>{
+    if(!confirm(`Remover plano "${p.name}"?`))return;
+    const r=await api.deletePlan(p.id);
+    if(r.error){showToast(r.error,'error');return;}
+    load();showToast('Plano removido');
+  };
+
+  const tvLabel=n=>n===-1?'Ilimitado':`${n} TV${n!==1?'s':''}`;
+  const planColor=['#0066FF','#8B5CF6','#22C55E','#F59E0B','#EF4444'];
+
   return (
-    <div className="p-4 md:p-6 fadein max-w-2xl">
-      <div className="flex items-center justify-between mb-5">
-        <div><h2 className="text-xl md:text-2xl font-bold">Usuários</h2><p className="text-gray-500 text-sm">Gerenciar acesso ao painel</p></div>
-        <button onClick={()=>open()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Novo</button>
+    <div className="fadein page-content">
+      <div style={{marginBottom:24,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+        <div>
+          <h2 className="page-title">Planos de Uso</h2>
+          <p className="page-sub">Configure limites e recursos para cada plano</p>
+        </div>
+        <button className="btn-primary" onClick={()=>open()}>+ Novo Plano</button>
       </div>
-      <div className="bg-blue-50 rounded-xl p-3 mb-4 text-xs text-blue-700">
-        <p>🔐 <strong>Admin:</strong> Acesso total · <strong>Operador:</strong> Gerencia conteúdo · <strong>Visualizador:</strong> Apenas leitura</p>
+
+      {/* Stats row */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:12,marginBottom:20}}>
+        <div className="stat-card fadein">
+          <div style={{fontSize:28,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,color:'#0066FF',marginBottom:4}}>{plans.length}</div>
+          <div style={{fontSize:12.5,color:'#64748B'}}>Planos ativos</div>
+        </div>
+        <div className="stat-card fadein">
+          <div style={{fontSize:28,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,color:'#8B5CF6',marginBottom:4}}>
+            {plans.reduce((a,p)=>a+(p.users_count||0),0)}
+          </div>
+          <div style={{fontSize:12.5,color:'#64748B'}}>Usuários com plano</div>
+        </div>
+        <div className="stat-card fadein">
+          <div style={{fontSize:28,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,color:'#22C55E',marginBottom:4}}>
+            {plans.filter(p=>p.max_tvs===-1).length>0?'∞':plans.reduce((a,p)=>a+(p.max_tvs||0),0)}
+          </div>
+          <div style={{fontSize:12.5,color:'#64748B'}}>TVs permitidas total</div>
+        </div>
       </div>
-      <div className="space-y-2">
-        {users.map(u=>(
-          <div key={u.id} className="sv-card border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-            <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center text-lg flex-shrink-0">
-              {u.role==='admin'?'👑':u.role==='operator'?'👤':'👁'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">{u.username}</p>
-              <p className="text-xs text-gray-400">Criado em {fmt.dt(u.created_at)}</p>
-            </div>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${roleColor[u.role]||'bg-gray-100 text-gray-600'}`}>{roleLabel[u.role]||u.role}</span>
-            <div className="flex gap-1.5 flex-shrink-0">
-              <button onClick={()=>open(u)} className="text-xs border border-gray-200 px-2.5 py-1.5 rounded-lg hover:border-blue-300 hover:text-blue-600 transition">✏️</button>
-              {u.username!=='admin'&&<button onClick={()=>del(u)} className="text-xs text-red-400 border border-gray-200 px-2.5 py-1.5 rounded-lg transition">🗑</button>}
+
+      {/* Plans grid */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>
+        {plans.map((p,i)=>(
+          <div key={p.id} className="panel fadein" style={{position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:planColor[i%planColor.length]}}/>
+            <div style={{padding:'18px 20px'}}>
+              <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:12}}>
+                <div>
+                  <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,fontSize:16,color:'#1E293B'}}>{p.name}</div>
+                  {p.description&&<div style={{fontSize:12,color:'#94A3B8',marginTop:2}}>{p.description}</div>}
+                </div>
+                <div style={{display:'flex',gap:6}}>
+                  <button onClick={()=>open(p)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 10px',fontSize:11,cursor:'pointer',fontWeight:600,color:'#64748B',transition:'all .15s'}}
+                    onMouseEnter={e=>{e.currentTarget.style.background='#EFF6FF';e.currentTarget.style.color='#0066FF';}}
+                    onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#64748B';}}>
+                    Editar
+                  </button>
+                  <button onClick={()=>del(p)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 8px',fontSize:11,cursor:'pointer',color:'#94A3B8',transition:'all .15s'}}
+                    onMouseEnter={e=>{e.currentTarget.style.background='#FEF2F2';e.currentTarget.style.color='#EF4444';}}
+                    onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#94A3B8';}}>
+                    🗑
+                  </button>
+                </div>
+              </div>
+
+              {/* TV limit bar */}
+              <div style={{background:'#F1F5F9',borderRadius:8,padding:'12px 14px',marginBottom:10}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+                  <span style={{fontSize:11.5,color:'#64748B',fontWeight:600}}>Limite de TVs</span>
+                  <span style={{fontSize:18,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,color:planColor[i%planColor.length]}}>
+                    {tvLabel(p.max_tvs)}
+                  </span>
+                </div>
+                <div style={{height:4,background:'#E2E8F0',borderRadius:4}}>
+                  <div style={{height:4,borderRadius:4,background:planColor[i%planColor.length],width:p.max_tvs===-1?'100%':`${Math.min(100,(p.max_tvs/20)*100)}%`,transition:'width .4s ease'}}/>
+                </div>
+              </div>
+
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <span style={{fontSize:12,color:'#94A3B8'}}>{p.users_count||0} usuário{p.users_count!==1?'s':''}</span>
+                {p.max_tvs===-1&&<span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:10,background:'#F0FDF4',color:'#16A34A',border:'1px solid #BBF7D0'}}>ENTERPRISE</span>}
+              </div>
             </div>
           </div>
         ))}
-        {users.length===0&&<p className="text-center text-gray-400 py-8">Nenhum usuário</p>}
+        {plans.length===0&&<div style={{textAlign:'center',padding:'48px',color:'#94A3B8',gridColumn:'1/-1'}}>
+          <div style={{fontSize:32,marginBottom:8}}>📋</div>
+          <div style={{fontWeight:500}}>Nenhum plano criado</div>
+          <button className="btn-primary" onClick={()=>open()} style={{marginTop:12,fontSize:12}}>Criar primeiro plano</button>
+        </div>}
       </div>
-      {modal&&<Modal title={edit?`Editar — ${edit.username}`:'Novo Usuário'} onClose={()=>setModal(false)} onSave={save}>
-        <Lbl>Nome de usuário</Lbl><Inp value={form.username} onChange={v=>setForm(f=>({...f,username:v}))} disabled={edit?.username==='admin'}/>
-        <Lbl>{edit?'Nova senha (deixe vazio para manter)':'Senha'}</Lbl><Inp value={form.password} onChange={v=>setForm(f=>({...f,password:v}))} type="password" placeholder={edit?'••••••••':'Mínimo 6 caracteres'}/>
-        <Lbl>Nível de acesso</Lbl>
+
+      {modal&&<Modal title={edit?`Editar Plano — ${edit.name}`:'Novo Plano'} onClose={()=>setModal(false)} onSave={save} saving={saving}>
+        <Lbl>Nome do plano</Lbl>
+        <Inp value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} placeholder="Ex: Business"/>
+        <Lbl>Limite de TVs</Lbl>
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          {[1,3,5,10,20].map(n=>(
+            <button key={n} onClick={()=>setForm(f=>({...f,max_tvs:n}))}
+              style={{flex:1,padding:'8px 4px',borderRadius:8,border:`2px solid ${form.max_tvs===n?'#0066FF':'#E2E8F0'}`,background:form.max_tvs===n?'#EFF6FF':'#fff',color:form.max_tvs===n?'#0066FF':'#64748B',fontWeight:700,fontSize:12,cursor:'pointer',transition:'all .15s'}}>
+              {n}
+            </button>
+          ))}
+          <button onClick={()=>setForm(f=>({...f,max_tvs:-1}))}
+            style={{flex:1,padding:'8px 4px',borderRadius:8,border:`2px solid ${form.max_tvs===-1?'#0066FF':'#E2E8F0'}`,background:form.max_tvs===-1?'#EFF6FF':'#fff',color:form.max_tvs===-1?'#0066FF':'#64748B',fontWeight:700,fontSize:11,cursor:'pointer',transition:'all .15s'}}>
+            ∞
+          </button>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+          <span style={{fontSize:12,color:'#64748B'}}>Ou digitar:</span>
+          <input type="number" min="1" value={form.max_tvs===-1?'':form.max_tvs} onChange={e=>setForm(f=>({...f,max_tvs:parseInt(e.target.value)||1}))} placeholder="Número" style={{width:80,padding:'6px 10px'}}/>
+        </div>
+        <Lbl>Descrição (opcional)</Lbl>
+        <Inp value={form.description} onChange={v=>setForm(f=>({...f,description:v}))} placeholder="Ex: Ideal para pequenas empresas"/>
+        <div style={{background:'#F8FAFC',border:'1px solid #E2E8F0',borderRadius:10,padding:'10px 14px',fontSize:12,color:'#64748B'}}>
+          {form.max_tvs===-1?'✅ TVs ilimitadas (plano Enterprise)':form.max_tvs>0?`📺 Este plano permite até ${form.max_tvs} TV${form.max_tvs!==1?'s':''}`:null}
+        </div>
+      </Modal>}
+    </div>
+  );
+}
+
+// ── USUÁRIOS ─────────────────────────────────────────────────────
+function UsersPage({showToast}){
+  const [users,setUsers]=useState([]);
+  const [plans,setPlans]=useState([]);
+  const [modal,setModal]=useState(false);
+  const [edit,setEdit]=useState(null);
+  const [form,setForm]=useState({username:'',password:'',role:'operator',plan_id:'',max_tvs_override:''});
+  const [saving,setSaving]=useState(false);
+
+  const load=async()=>{
+    const [u,p]=await Promise.all([api.getUsers(),api.getPlans()]);
+    Array.isArray(u)&&setUsers(u);
+    Array.isArray(p)&&setPlans(p);
+  };
+  useEffect(()=>{load();},[]);
+
+  const open=(u=null)=>{
+    setEdit(u);
+    setForm(u?{username:u.username,password:'',role:u.role,plan_id:u.plan_id||'',max_tvs_override:u.max_tvs_override||''}:{username:'',password:'',role:'operator',plan_id:'',max_tvs_override:''});
+    setModal(true);
+  };
+
+  const save=async()=>{
+    if(!form.username.trim())return;
+    if(!edit&&!form.password.trim()){showToast('Senha obrigatória','error');return;}
+    setSaving(true);
+    const d={username:form.username,role:form.role,plan_id:form.plan_id||null};
+    if(form.password)d.password=form.password;
+    if(form.max_tvs_override!=='')d.max_tvs_override=form.max_tvs_override===''?null:parseInt(form.max_tvs_override);
+    const r=edit?await api.updateUser(edit.id,d):await api.createUser(d);
+    setSaving(false);
+    if(r.error){showToast(r.error,'error');return;}
+    setModal(false);load();showToast(edit?'Usuário atualizado!':'Usuário criado!');
+  };
+
+  const del=async u=>{if(!confirm(`Remover ${u.username}?`))return;await api.deleteUser(u.id);load();showToast('Removido');};
+
+  const roleColor={admin:'#FEF2F2:#DC2626',operator:'#EFF6FF:#2563EB',viewer:'#F1F5F9:#64748B'};
+  const roleLabel={admin:'Admin',operator:'Operador',viewer:'Visualizador'};
+  const getRoleStyle=(role)=>{
+    const m={admin:{bg:'#FEF2F2',color:'#DC2626',border:'#FECACA'},operator:{bg:'#EFF6FF',color:'#2563EB',border:'#BFDBFE'},viewer:{bg:'#F1F5F9',color:'#64748B',border:'#E2E8F0'}};
+    return m[role]||m.viewer;
+  };
+
+  return (
+    <div className="fadein page-content">
+      <div style={{marginBottom:24,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+        <div>
+          <h2 className="page-title">Usuários</h2>
+          <p className="page-sub">Gerenciar acesso e planos de cada usuário</p>
+        </div>
+        <button className="btn-primary" onClick={()=>open()}>+ Novo Usuário</button>
+      </div>
+
+      {/* Summary stats */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12,marginBottom:20}}>
+        <div className="stat-card fadein" style={{cursor:'default'}}>
+          <div style={{fontSize:26,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,color:'#0066FF',marginBottom:4}}>{users.length}</div>
+          <div style={{fontSize:12.5,color:'#64748B'}}>Total usuários</div>
+        </div>
+        <div className="stat-card fadein" style={{cursor:'default'}}>
+          <div style={{fontSize:26,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,color:'#DC2626',marginBottom:4}}>{users.filter(u=>u.role==='admin').length}</div>
+          <div style={{fontSize:12.5,color:'#64748B'}}>Administradores</div>
+        </div>
+        <div className="stat-card fadein" style={{cursor:'default'}}>
+          <div style={{fontSize:26,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,color:'#2563EB',marginBottom:4}}>{users.filter(u=>u.role==='operator').length}</div>
+          <div style={{fontSize:12.5,color:'#64748B'}}>Operadores</div>
+        </div>
+        <div className="stat-card fadein" style={{cursor:'default'}}>
+          <div style={{fontSize:26,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,color:'#22C55E',marginBottom:4}}>{users.reduce((a,u)=>a+(parseInt(u.tvs_used)||0),0)}</div>
+          <div style={{fontSize:12.5,color:'#64748B'}}>TVs alocadas</div>
+        </div>
+      </div>
+
+      {/* Users table */}
+      <div className="panel fadein">
+        <div className="panel-header">
+          <span className="panel-title">Lista de Usuários</span>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <table>
+            <thead><tr>
+              <th>Usuário</th><th>Função</th><th>Plano</th><th>TVs</th><th>Criado em</th><th>Ações</th>
+            </tr></thead>
+            <tbody>
+              {users.map(u=>{
+                const rs=getRoleStyle(u.role);
+                const maxTvs=parseInt(u.effective_max_tvs);
+                const tvsUsed=parseInt(u.tvs_used)||0;
+                const pct=maxTvs===-1?0:maxTvs>0?Math.round((tvsUsed/maxTvs)*100):0;
+                const isOver=maxTvs>0&&tvsUsed>=maxTvs;
+                return (
+                  <tr key={u.id}>
+                    <td>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <div style={{width:32,height:32,borderRadius:8,background:'linear-gradient(135deg,#0066FF,#0099FF)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:700,color:'#fff',flexShrink:0}}>
+                          {u.username[0].toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{fontWeight:600,fontSize:13}}>{u.username}</div>
+                          <div style={{fontSize:11,color:'#94A3B8'}}>ID #{u.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:20,background:rs.bg,color:rs.color,border:`1px solid ${rs.border}`}}>
+                        {roleLabel[u.role]||u.role}
+                      </span>
+                    </td>
+                    <td>
+                      {u.plan_name
+                        ? <span style={{fontSize:12,fontWeight:600,color:'#7C3AED'}}>{u.plan_name}</span>
+                        : <span style={{fontSize:11,color:'#94A3B8'}}>Sem plano</span>}
+                    </td>
+                    <td style={{minWidth:120}}>
+                      {u.plan_id?(
+                        <div>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                            <span style={{fontSize:11,color:'#64748B'}}>{tvsUsed}/{maxTvs===-1?'∞':maxTvs}</span>
+                            {isOver&&<span style={{fontSize:10,color:'#EF4444',fontWeight:700}}>LIMITE</span>}
+                          </div>
+                          <div style={{height:4,background:'#F1F5F9',borderRadius:4}}>
+                            <div style={{height:4,borderRadius:4,background:isOver?'#EF4444':'#0066FF',width:maxTvs===-1?'20%':`${Math.min(100,pct)}%`,transition:'width .4s'}}/>
+                          </div>
+                        </div>
+                      ):(
+                        <span style={{fontSize:11,color:'#94A3B8'}}>—</span>
+                      )}
+                    </td>
+                    <td style={{fontSize:12,color:'#94A3B8'}}>{fmt.dt(u.created_at)}</td>
+                    <td>
+                      <div style={{display:'flex',gap:6}}>
+                        <button onClick={()=>open(u)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 10px',fontSize:11,cursor:'pointer',fontWeight:600,color:'#64748B',transition:'all .15s'}}
+                          onMouseEnter={e=>{e.currentTarget.style.background='#EFF6FF';e.currentTarget.style.color='#0066FF';}}
+                          onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#64748B';}}>
+                          Editar
+                        </button>
+                        {u.username!=='admin'&&<button onClick={()=>del(u)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 8px',fontSize:11,cursor:'pointer',color:'#94A3B8',transition:'all .15s'}}
+                          onMouseEnter={e=>{e.currentTarget.style.background='#FEF2F2';e.currentTarget.style.color='#EF4444';}}
+                          onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#94A3B8';}}>
+                          🗑
+                        </button>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {users.length===0&&<tr><td colSpan="6" style={{textAlign:'center',padding:'40px',color:'#94A3B8'}}>Nenhum usuário cadastrado</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {modal&&<Modal title={edit?`Editar — ${edit.username}`:'Novo Usuário'} onClose={()=>setModal(false)} onSave={save} saving={saving}>
+        <Lbl>Nome de usuário</Lbl>
+        <Inp value={form.username} onChange={v=>setForm(f=>({...f,username:v}))} disabled={edit?.username==='admin'}/>
+        <Lbl>{edit?'Nova senha (deixe vazio para manter)':'Senha'}</Lbl>
+        <Inp value={form.password} onChange={v=>setForm(f=>({...f,password:v}))} type="password" placeholder={edit?'••••••••':'Mínimo 6 caracteres'}/>
+        <Lbl>Função</Lbl>
         <Sel value={form.role} onChange={v=>setForm(f=>({...f,role:v}))}>
           <option value="admin">👑 Admin — Acesso total</option>
           <option value="operator">👤 Operador — Gerencia conteúdo</option>
           <option value="viewer">👁 Visualizador — Apenas leitura</option>
         </Sel>
+        <Lbl>Plano</Lbl>
+        <Sel value={form.plan_id} onChange={v=>setForm(f=>({...f,plan_id:v}))}>
+          <option value="">— Sem plano —</option>
+          {plans.map(p=><option key={p.id} value={p.id}>{p.name} ({p.max_tvs===-1?'Ilimitado':`${p.max_tvs} TVs`})</option>)}
+        </Sel>
+        <Lbl>Override de TVs (opcional)</Lbl>
+        <Inp value={form.max_tvs_override} onChange={v=>setForm(f=>({...f,max_tvs_override:v}))} placeholder="Deixe vazio para usar o limite do plano" type="number"/>
+        <div style={{fontSize:11,color:'#94A3B8',marginTop:-8,marginBottom:8}}>Sobrescreve o limite do plano para este usuário específico. Use -1 para ilimitado.</div>
       </Modal>}
     </div>
   );

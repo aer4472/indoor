@@ -44,6 +44,7 @@ app.use('/api/schedules', authMiddleware, require('./routes/schedules'));
 app.use('/api/emergency', authMiddleware, require('./routes/emergency'));
 app.use('/api/widgets',   authMiddleware, require('./routes/widgets'));
 app.use('/api/users',     authMiddleware, require('./routes/users'));
+app.use('/api/plans',     authMiddleware, require('./routes/plans'));
 app.use('/api/reports',   authMiddleware, require('./routes/reports'));
 
 app.get('/api/health', (req, res) => res.json({ status:'ok', version:'4.0', timestamp:new Date().toISOString() }));

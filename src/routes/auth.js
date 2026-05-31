@@ -24,13 +24,26 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
+    // Busca plano do usuário
+    const userPlan = await db.get(`
+      SELECT p.name as plan_name, p.max_tvs,
+             COALESCE(u.max_tvs_override, p.max_tvs, 0) as effective_max_tvs
+      FROM users u LEFT JOIN plans p ON u.plan_id = p.id WHERE u.id = $1
+    `, [user.id]);
+
     const token = jwt.sign(
-      { id: user.id, username: user.username },
+      { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
 
-    res.json({ token, username: user.username });
+    res.json({
+      token,
+      username: user.username,
+      role: user.role,
+      plan: userPlan?.plan_name || null,
+      max_tvs: userPlan?.effective_max_tvs ?? 0,
+    });
   } catch (error) {
     next(error);
   }

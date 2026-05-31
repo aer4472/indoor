@@ -22,11 +22,34 @@ router.post('/', async (req, res, next) => {
   try {
     const { name, orientation='horizontal', playlist_id, volume=100, transition='fade' } = req.body;
     if (!name) return res.status(400).json({ error: 'name obrigatório' });
+
+    // ── Verificar limite de TVs do plano ──────────────────────────
+    if (req.user) {
+      const userData = await db.get(`
+        SELECT COALESCE(u.max_tvs_override, p.max_tvs, 0) as max_tvs,
+               COUNT(DISTINCT t.id) as tvs_used
+        FROM users u
+        LEFT JOIN plans p ON u.plan_id = p.id
+        LEFT JOIN tvs t ON t.user_id = u.id
+        WHERE u.id = ?
+        GROUP BY u.id, u.max_tvs_override, p.max_tvs
+      `, [req.user.id]);
+      if (userData && userData.max_tvs !== -1 && parseInt(userData.tvs_used) >= parseInt(userData.max_tvs)) {
+        return res.status(403).json({
+          error: `Limite de TVs atingido`,
+          limit: userData.max_tvs,
+          used: userData.tvs_used,
+          upgrade: true
+        });
+      }
+    }
+
     const id = `tv-${uuidv4().substring(0,8)}`;
     const pin = genPin();
+    const userId = req.user?.id || null;
     await db.run(
-      'INSERT INTO tvs (id,name,orientation,playlist_id,volume,transition,status,pin) VALUES (?,?,?,?,?,?,?,?)',
-      [id, name, orientation, playlist_id||null, volume, transition, 'offline', pin]
+      'INSERT INTO tvs (id,name,orientation,playlist_id,volume,transition,status,pin,user_id) VALUES (?,?,?,?,?,?,?,?,?)',
+      [id, name, orientation, playlist_id||null, volume, transition, 'offline', pin, userId]
     );
     const tv = await db.get('SELECT * FROM tvs WHERE id = ?', [id]);
     res.status(201).json(tv);
