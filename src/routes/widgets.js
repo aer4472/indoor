@@ -13,7 +13,10 @@ function parseConfig(raw) {
 
 router.get('/', async (req, res, next) => {
   try {
-    const rows = await db.all('SELECT * FROM widgets ORDER BY created_at DESC');
+    const { isAdmin, userId } = require('../middleware/tenant').tenantFilter(req);
+    const rows = isAdmin
+      ? await db.all('SELECT * FROM widgets ORDER BY created_at DESC')
+      : await db.all('SELECT * FROM widgets WHERE user_id = ? OR user_id IS NULL ORDER BY created_at DESC', [userId]);
     res.json(rows.map(r => ({ ...r, config: parseConfig(r.config) })));
   } catch (e) { next(e); }
 });
@@ -26,7 +29,8 @@ router.post('/', async (req, res, next) => {
     const cfg = typeof config==='string' ? config : JSON.stringify(config);
     const tvStr = Array.isArray(tv_ids) ? tv_ids.join(',') : (tv_ids||'');
     const rot = [0,90,180,270].includes(Number(rotation)) ? Number(rotation) : 0;
-    await db.run('INSERT INTO widgets (id,name,type,config,position,active,tv_ids,rotation) VALUES (?,?,?,?,?,?,?,?)',
+    const { userId: wgtUserId } = require('../middleware/tenant').tenantFilter(req);
+    await db.run('INSERT INTO widgets (id,name,type,config,position,active,tv_ids,rotation,user_id) VALUES (?,?,?,?,?,?,?,?,?)',
       [id, name, type, cfg, position, active?1:0, tvStr, rot]);
     const row = await db.get('SELECT * FROM widgets WHERE id=?', [id]);
     broadcast.contentChanged(null, 'widget-created');

@@ -124,10 +124,11 @@ router.post('/youtube', async (req, res, next) => {
 
     const displayName = name && name.trim() ? name.trim() : `${typeLabel}: ${filename}`;
 
+    const { userId: ytUserId } = require('../middleware/tenant').tenantFilter(req);
     await db.run(
-      `INSERT INTO videos (id, filename, original_name, size, mime_type, media_type, display_duration)
-       VALUES (?, ?, ?, 0, ?, 'youtube', 0)`,
-      [id, filename, displayName, mimeType]
+      `INSERT INTO videos (id, filename, original_name, size, mime_type, media_type, display_duration, user_id)
+       VALUES (?, ?, ?, 0, ?, 'youtube', 0, ?)`,
+      [id, filename, displayName, mimeType, ytUserId||null]
     );
 
     const video = await db.get('SELECT * FROM videos WHERE id = ?', [id]);
@@ -182,8 +183,11 @@ router.put('/card/:id', async (req, res, next) => {
 
 router.get('/', async (req, res, next) => {
   try {
-    const videos = await db.all('SELECT * FROM videos ORDER BY created_at DESC');
-    res.json(videos.map(v => ({ ...v, config: JSON.parse(v.config || '{}') })));
+    const { isAdmin, userId } = require('../middleware/tenant').tenantFilter(req);
+    const videos = isAdmin
+      ? await db.all('SELECT * FROM videos ORDER BY created_at DESC')
+      : await db.all('SELECT * FROM videos WHERE user_id = ? ORDER BY created_at DESC', [userId]);
+res.json(videos.map(v => ({ ...v, config: JSON.parse(v.config || '{}') })));
   } catch (error) {
     next(error);
   }

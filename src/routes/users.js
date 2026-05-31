@@ -69,7 +69,7 @@ router.post('/', async (req, res, next) => {
     const created = await db.get('SELECT id, username, role, plan_id FROM users WHERE id = $1', [r.id]);
     res.json(created);
   } catch(e) {
-    if (e.code === '23505') return res.status(409).json({ error: 'Usuário já existe' });
+    if (e.code === '23505' || e.message?.includes('unique') || e.message?.includes('duplicate')) return res.status(409).json({ error: 'Usuário já existe' });
     next(e);
   }
 });

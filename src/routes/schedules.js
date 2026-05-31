@@ -9,10 +9,20 @@ function setIO(io) { broadcast.setIO(io); }
 router.get('/', async (req, res, next) => {
   try {
     const { tv_id } = req.query;
-    const sql = tv_id
-      ? 'SELECT s.*,p.name as playlist_name FROM schedules s LEFT JOIN playlists p ON s.playlist_id=p.id WHERE s.tv_id=? ORDER BY s.start_time'
-      : 'SELECT s.*,p.name as playlist_name,t.name as tv_name FROM schedules s LEFT JOIN playlists p ON s.playlist_id=p.id LEFT JOIN tvs t ON s.tv_id=t.id ORDER BY s.tv_id,s.start_time';
-    const rows = await db.all(sql, tv_id ? [tv_id] : []);
+    const { isAdmin, userId } = require('../middleware/tenant').tenantFilter(req);
+    let sql, params;
+    if (tv_id) {
+      sql = isAdmin
+        ? 'SELECT s.*,p.name as playlist_name FROM schedules s LEFT JOIN playlists p ON s.playlist_id=p.id WHERE s.tv_id=? ORDER BY s.start_time'
+        : 'SELECT s.*,p.name as playlist_name FROM schedules s LEFT JOIN playlists p ON s.playlist_id=p.id WHERE s.tv_id=? AND s.user_id=? ORDER BY s.start_time';
+      params = isAdmin ? [tv_id] : [tv_id, userId];
+    } else {
+      sql = isAdmin
+        ? 'SELECT s.*,p.name as playlist_name,t.name as tv_name FROM schedules s LEFT JOIN playlists p ON s.playlist_id=p.id LEFT JOIN tvs t ON s.tv_id=t.id ORDER BY s.tv_id,s.start_time'
+        : 'SELECT s.*,p.name as playlist_name,t.name as tv_name FROM schedules s LEFT JOIN playlists p ON s.playlist_id=p.id LEFT JOIN tvs t ON s.tv_id=t.id WHERE s.user_id=? ORDER BY s.tv_id,s.start_time';
+      params = isAdmin ? [] : [userId];
+    }
+    const rows = await db.all(sql, params);
     res.json(rows.map(r => ({ ...r, days: JSON.parse(r.days||'[]') })));
   } catch (e) { next(e); }
 });
@@ -23,9 +33,10 @@ router.post('/', async (req, res, next) => {
     if (!tv_id||!playlist_id||!start_time||!end_time)
       return res.status(400).json({ error: 'tv_id, playlist_id, start_time e end_time obrigatórios' });
     const id = `sched-${uuidv4().substring(0,8)}`;
+    const { userId: schedUserId } = require('../middleware/tenant').tenantFilter(req);
     await db.run(
-      'INSERT INTO schedules (id,tv_id,playlist_id,name,start_time,end_time,days) VALUES (?,?,?,?,?,?,?)',
-      [id, tv_id, playlist_id, name||`${start_time}–${end_time}`, start_time, end_time, JSON.stringify(days)]
+      'INSERT INTO schedules (id,tv_id,playlist_id,name,start_time,end_time,days,user_id) VALUES (?,?,?,?,?,?,?,?)',
+      [id, tv_id, playlist_id, name||`${start_time}–${end_time}`, start_time, end_time, JSON.stringify(days), schedUserId||null]
     );
     const row = await db.get('SELECT * FROM schedules WHERE id = ?', [id]);
     broadcast.contentChanged(tv_id, 'schedule-created');
