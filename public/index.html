@@ -735,19 +735,14 @@ body.has-banner #hero { padding-top:152px; }
 
 <!-- HERO -->
 <section id="hero" style="overflow:hidden;isolation:isolate">
-  <!-- Hero background — imagem corporativa com overlay -->
-  <div style="position:absolute;inset:0;z-index:0;overflow:hidden;border-radius:0">
-    <div style="position:absolute;inset:0;
-      background-image:url('/hero-bg.png');
-      background-size:cover;background-position:center;
-      opacity:.22;transform:scale(1.03);filter:blur(0.5px)">
-    </div>
-    <!-- Overlay escuro que garante legibilidade -->
-    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,14,26,.78) 0%,rgba(10,14,26,.6) 40%,rgba(10,14,26,.98) 90%,var(--dark) 100%)"></div>
-    <!-- Radial azul sutil -->
-    <div style="position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -5%,rgba(37,99,235,.2) 0%,transparent 65%)"></div>
+  <!-- Animated canvas background -->
+  <canvas id="heroCanvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:.7"></canvas>
+  <!-- Gradient overlay on top of canvas -->
+  <div style="position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:radial-gradient(ellipse 90% 55% at 50% -5%,rgba(37,99,235,.18) 0%,transparent 65%),
+    linear-gradient(180deg,rgba(10,14,26,.3) 0%,rgba(10,14,26,.1) 50%,rgba(10,14,26,.95) 95%,var(--dark) 100%)">
   </div>
-  <div class="hero-grid"></div>
+  <div class="hero-grid" style="opacity:.4"></div>
 
   <div class="hero-pill anim"><div class="pill-dot"></div>Sistema de TV Corporativa · Digital Signage</div>
 
@@ -1269,6 +1264,144 @@ function sendForm(){
     document.getElementById('cfOk').style.display = 'block';
   }, 600);
 }
+
+// ── HERO CANVAS ANIMATION ────────────────────────────────────
+(function(){
+  const canvas = document.getElementById('heroCanvas');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  let W, H, nodes, mouse = {x:-9999, y:-9999};
+  const NODE_COUNT   = 70;
+  const MAX_DIST     = 140;
+  const NODE_SPEED   = 0.35;
+  const COLOR_NODE   = '96,165,250';   // blue-400
+  const COLOR_LINE   = '59,130,246';   // blue-500
+  const COLOR_ACCENT = '6,182,212';    // cyan
+
+  function resize(){
+    W = canvas.width  = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+
+  function createNodes(){
+    nodes = Array.from({length: NODE_COUNT}, (_, i) => ({
+      x:  Math.random() * W,
+      y:  Math.random() * H,
+      vx: (Math.random() - .5) * NODE_SPEED,
+      vy: (Math.random() - .5) * NODE_SPEED,
+      r:  Math.random() * 1.8 + 1,
+      pulse: Math.random() * Math.PI * 2,
+      // A few nodes are "TV screens" — slightly larger, cyan
+      isTV: i < 8,
+    }));
+  }
+
+  function draw(){
+    ctx.clearRect(0, 0, W, H);
+
+    // Update positions
+    for(const n of nodes){
+      n.x += n.vx;
+      n.y += n.vy;
+      n.pulse += 0.02;
+      if(n.x < 0 || n.x > W) n.vx *= -1;
+      if(n.y < 0 || n.y > H) n.vy *= -1;
+
+      // Slight attraction to mouse
+      const dx = mouse.x - n.x;
+      const dy = mouse.y - n.y;
+      const d  = Math.sqrt(dx*dx + dy*dy);
+      if(d < 200){
+        n.vx += dx * .00012;
+        n.vy += dy * .00012;
+        // Clamp speed
+        const spd = Math.sqrt(n.vx*n.vx + n.vy*n.vy);
+        if(spd > NODE_SPEED * 2){ n.vx *= .95; n.vy *= .95; }
+      }
+    }
+
+    // Draw connections
+    for(let i = 0; i < nodes.length; i++){
+      for(let j = i+1; j < nodes.length; j++){
+        const a = nodes[i], b = nodes[j];
+        const dx = a.x - b.x, dy = a.y - b.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < MAX_DIST){
+          const alpha = (1 - dist/MAX_DIST) * .45;
+          // TV-to-TV connections get cyan color
+          const isSpecial = a.isTV && b.isTV;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.strokeStyle = isSpecial
+            ? `rgba(${COLOR_ACCENT},${alpha * 1.4})`
+            : `rgba(${COLOR_LINE},${alpha})`;
+          ctx.lineWidth = isSpecial ? 1 : 0.6;
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw nodes
+    for(const n of nodes){
+      const glow = .7 + Math.sin(n.pulse) * .3;
+      const radius = n.r * glow;
+
+      if(n.isTV){
+        // TV node — draw a small rounded rect
+        const s = radius * 3.5;
+        ctx.save();
+        ctx.translate(n.x, n.y);
+        ctx.beginPath();
+        ctx.roundRect(-s/2, -s*0.6/2, s, s*0.6, 2);
+        ctx.fillStyle   = `rgba(${COLOR_ACCENT},${.08 + glow*.08})`;
+        ctx.strokeStyle = `rgba(${COLOR_ACCENT},${.5 * glow})`;
+        ctx.lineWidth = .8;
+        ctx.fill();
+        ctx.stroke();
+        // Screen glow
+        ctx.beginPath();
+        ctx.arc(0, 0, s*.9, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(${COLOR_ACCENT},${.04 * glow})`;
+        ctx.fill();
+        ctx.restore();
+      } else {
+        // Regular node — dot with glow
+        const grad = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, radius * 3);
+        grad.addColorStop(0, `rgba(${COLOR_NODE},${.9 * glow})`);
+        grad.addColorStop(1, `rgba(${COLOR_NODE},0)`);
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, radius * 3, 0, Math.PI*2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, radius, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(${COLOR_NODE},${.85 * glow})`;
+        ctx.fill();
+      }
+    }
+
+    // Occasional "data pulse" along a random connection
+    requestAnimationFrame(draw);
+  }
+
+  // Init
+  resize();
+  createNodes();
+  draw();
+
+  window.addEventListener('resize', ()=>{ resize(); });
+  document.getElementById('hero').addEventListener('mousemove', e=>{
+    const r = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - r.left;
+    mouse.y = e.clientY - r.top;
+  });
+  document.getElementById('hero').addEventListener('mouseleave', ()=>{
+    mouse.x = -9999; mouse.y = -9999;
+  });
+})();
 
 // ── PROMO BANNER ─────────────────────────────────────────────
 let bannerSlide = 0;
