@@ -3513,54 +3513,79 @@ function UsersPage({showToast}){
                     </td>
                     <td>
                       <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-                        <button onClick={()=>open(u)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 10px',fontSize:11,cursor:'pointer',fontWeight:600,color:'#64748B',transition:'all .15s'}}
+
+                        {/* Editar — sempre disponível */}
+                        <button onClick={()=>open(u)}
+                          style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 10px',fontSize:11,cursor:'pointer',fontWeight:600,color:'#64748B',transition:'all .15s'}}
                           onMouseEnter={e=>{e.currentTarget.style.background='#EFF6FF';e.currentTarget.style.color='#0066FF';}}
                           onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#64748B';}}>
                           Editar
                         </button>
-                        {u.username!=='admin'&&u.account_status!=='suspended'&&(
-                          <button onClick={async()=>{
-                            const r=await api.suspendUser(u.id,'Suspenso pelo admin');
-                            if(r.success){showToast('Conta suspensa');load();}else showToast(r.error,'error');
-                          }} style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#DC2626',fontWeight:600}}>
-                            ⏸ Suspender
-                          </button>
-                        )}
-                        {u.username!=='admin'&&(u.account_status==='suspended'||u.account_status==='expired')&&(
-                          <button onClick={async()=>{
-                            const days=prompt('Reativar por quantos dias?','30');
-                            if(!days)return;
-                            const r=await api.activateUser(u.id,parseInt(days));
-                            if(r.success){showToast(r.message);load();}else showToast(r.error,'error');
-                          }} style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#16A34A',fontWeight:600}}>
-                            ▶ Reativar
-                          </button>
-                        )}
-                        {u.username!=='admin'&&u.account_status==='active'&&(
-                          <button onClick={async()=>{
-                            const days=prompt('Renovar por quantos dias?','30');
-                            if(!days)return;
-                            const r=await api.renewUser(u.id,parseInt(days));
-                            if(r.success){showToast(r.message);load();}else showToast(r.error,'error');
-                          }} style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#2563EB',fontWeight:600}}>
-                            🔄 Renovar
-                          </button>
-                        )}
-                        {u.username!=='admin'&&(
-                          <button onClick={async()=>{
-                            const days=prompt('Modo demonstração — quantos dias?','3');
-                            if(!days||isNaN(days))return;
-                            const r=await api.setDemo(u.id,parseInt(days));
-                            if(r.success){showToast(`Demo de ${days} dia(s) ativado!`);load();}else showToast(r.error,'error');
-                          }} style={{background:'linear-gradient(135deg,#F5F3FF,#EDE9FE)',border:'1px solid #DDD6FE',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#7C3AED',fontWeight:600}}>
-                            🎯 Demo
-                          </button>
-                        )}
-                        {u.username!=='admin'&&<button onClick={()=>del(u)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 8px',fontSize:11,cursor:'pointer',color:'#94A3B8'}}
-                          onMouseEnter={e=>{e.currentTarget.style.background='#FEF2F2';e.currentTarget.style.color='#EF4444';}}
-                          onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#94A3B8';}}>
-                          🗑
-                        </button>}
+
+                        {u.username!=='admin'&&(()=>{
+                          const st = u.account_status||'active';
+                          return (<>
+
+                            {/* SUSPENDER — se ativo ou trial */}
+                            {(st==='active'||st==='trial')&&(
+                              <button onClick={async()=>{
+                                if(!confirm(`Suspender a conta de "${u.username}"?`)) return;
+                                const r=await api.suspendUser(u.id,'Suspenso pelo admin');
+                                if(r.success){showToast('Conta suspensa');load();}
+                                else showToast(r.error,'error');
+                              }} style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#DC2626',fontWeight:600}}>
+                                ⏸ Suspender
+                              </button>
+                            )}
+
+                            {/* REATIVAR — se suspenso ou expirado */}
+                            {(st==='suspended'||st==='expired')&&(
+                              <button onClick={async()=>{
+                                const days=prompt(`Reativar "${u.username}" por quantos dias?`,'30');
+                                if(!days||isNaN(days)) return;
+                                const r=await api.activateUser(u.id,parseInt(days));
+                                if(r.success){showToast(r.message);load();}
+                                else showToast(r.error,'error');
+                              }} style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#16A34A',fontWeight:700}}>
+                                ▶ Reativar
+                              </button>
+                            )}
+
+                            {/* RENOVAR — se ativo (adiciona dias na assinatura) */}
+                            {st==='active'&&(
+                              <button onClick={async()=>{
+                                const days=prompt(`Renovar assinatura de "${u.username}" por quantos dias?`,'30');
+                                if(!days||isNaN(days)) return;
+                                const r=await api.renewUser(u.id,parseInt(days));
+                                if(r.success){showToast(r.message);load();}
+                                else showToast(r.error,'error');
+                              }} style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#2563EB',fontWeight:600}}>
+                                🔄 Renovar
+                              </button>
+                            )}
+
+                            {/* DEMO — disponível para qualquer usuário não-admin */}
+                            <button onClick={async()=>{
+                              const days=prompt(`Modo demonstração para "${u.username}" — quantos dias?`,'3');
+                              if(!days||isNaN(days)) return;
+                              const r=await api.setDemo(u.id,parseInt(days));
+                              if(r.success){showToast(`✅ Demo de ${days} dia(s) ativado!`);load();}
+                              else showToast(r.error,'error');
+                            }} style={{background:'linear-gradient(135deg,#F5F3FF,#EDE9FE)',border:'1px solid #DDD6FE',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#7C3AED',fontWeight:600}}>
+                              🎯 Demo
+                            </button>
+
+                            {/* EXCLUIR */}
+                            <button onClick={()=>del(u)}
+                              style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 8px',fontSize:11,cursor:'pointer',color:'#94A3B8'}}
+                              onMouseEnter={e=>{e.currentTarget.style.background='#FEF2F2';e.currentTarget.style.color='#EF4444';}}
+                              onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#94A3B8';}}>
+                              🗑
+                            </button>
+
+                          </>);
+                        })()}
+
                       </div>
                     </td>
                   </tr>
