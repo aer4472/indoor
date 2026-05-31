@@ -37,8 +37,8 @@ app.use('/api/settings', require('./middleware/auth').authMiddleware, require('.
 app.use('/api/backup',  require('./middleware/auth').authMiddleware, require('./routes/backup'));
 
 // ── Protegidas ────────────────────────────────────────────────────
-app.use('/api/tvs',       authMiddleware, require('./routes/tvs'));
-app.use('/api/playlists', authMiddleware, require('./routes/PlayLists'));
+app.use('/api/tvs',       authMiddleware, require('./routes/tvs').router);
+app.use('/api/playlists', authMiddleware, require('./routes/PlayLists').router);
 app.use('/api/videos',    authMiddleware, require('./routes/videos'));
 app.use('/api/schedules', authMiddleware, require('./routes/schedules'));
 app.use('/api/emergency', authMiddleware, require('./routes/emergency'));

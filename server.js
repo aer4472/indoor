@@ -14,8 +14,8 @@ broadcast.setIO(io);
 
 // Injetar io nas rotas que precisam (emergency usa io direto)
 [
-  require('./src/routes/tvs'),
-  require('./src/routes/PlayLists'),
+  require('./src/routes/tvs').router,
+  require('./src/routes/PlayLists').router,
   require('./src/routes/player'),
   require('./src/routes/emergency'),
   require('./src/routes/schedules'),
