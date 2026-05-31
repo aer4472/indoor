@@ -2,9 +2,10 @@ const express = require('express');
 const router  = express.Router();
 const bcrypt  = require('bcryptjs');
 const db      = require('../database/db');
+const { adminOnly, auditLog } = require('../middleware/security');
 
 // ── Listar usuários com plano e uso de TVs ────────────────────────
-router.get('/', async (req, res, next) => {
+router.get('/', adminOnly, async (req, res, next) => {
   try {
     const users = await db.all(`
       SELECT u.id, u.username, u.role, u.created_at,
@@ -53,13 +54,16 @@ router.get('/me', async (req, res, next) => {
 });
 
 // ── Criar usuário ─────────────────────────────────────────────────
-router.post('/', async (req, res, next) => {
+router.post('/', adminOnly, async (req, res, next) => {
   try {
     const { username, password, role = 'operator', plan_id } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'username e password obrigatórios' });
     if (!['admin','operator','viewer'].includes(role)) return res.status(400).json({ error: 'role inválida' });
-    if (password.length < 6) return res.status(400).json({ error: 'Senha mínima de 6 caracteres' });
-    const hash = await bcrypt.hash(password, 10);
+    if (password.length < 8) return res.status(400).json({ error: 'Senha mínima de 8 caracteres' });
+    if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return res.status(400).json({ error: 'A senha deve conter ao menos um número ou caractere especial.' });
+    }
+    const hash = await bcrypt.hash(password, 12);
     const r = await db.run(
       'INSERT INTO users (username, password, role, plan_id) VALUES (?,?,?,?)',
       [username, hash, role, plan_id || null]
@@ -90,8 +94,11 @@ router.put('/:id', async (req, res, next) => {
     const newOverride = max_tvs_override !== undefined ? (max_tvs_override === '' ? null : parseInt(max_tvs_override)) : user.max_tvs_override;
     let newHash = user.password;
     if (password) {
-      if (password.length < 6) return res.status(400).json({ error: 'Senha mínima de 6 caracteres' });
-      newHash = await bcrypt.hash(password, 10);
+      if (password.length < 8) return res.status(400).json({ error: 'Senha mínima de 8 caracteres' });
+    if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      return res.status(400).json({ error: 'A senha deve conter ao menos um número ou caractere especial.' });
+    }
+      newHash = await bcrypt.hash(password, 12);
     }
     await db.run(
       'UPDATE users SET username=?,password=?,role=?,plan_id=?,max_tvs_override=? WHERE id=?',
@@ -110,7 +117,7 @@ router.put('/:id', async (req, res, next) => {
 });
 
 // ── Deletar usuário ───────────────────────────────────────────────
-router.delete('/:id', async (req, res, next) => {
+router.delete('/:id', adminOnly, async (req, res, next) => {
   try {
     const user = await db.get('SELECT * FROM users WHERE id=?', [req.params.id]);
     if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });

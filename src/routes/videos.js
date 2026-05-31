@@ -9,6 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const ffmpeg = require('fluent-ffmpeg');
 const ffprobeStatic = require('ffprobe-static');
 const broadcast = require('../broadcast');
+const { validateFileUpload, uploadLimiter, auditLog } = require('../middleware/security');
 
 ffmpeg.setFfprobePath(ffprobeStatic.path);
 
@@ -193,7 +194,7 @@ res.json(videos.map(v => ({ ...v, config: JSON.parse(v.config || '{}') })));
   }
 });
 
-router.post('/upload', upload.single('video'), async (req, res, next) => {
+router.post('/upload', uploadLimiter, upload.single('video'), validateFileUpload, async (req, res, next) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   }

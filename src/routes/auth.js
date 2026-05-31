@@ -1,12 +1,40 @@
-// src/routes/auth.js
-const express = require('express');
-const router = express.Router();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const db = require('../database/db');
-const { JWT_SECRET } = require('../middleware/auth');
+/**
+ * SMARTVISION PRO — Auth Routes
+ * Login com brute force protection, password policy, audit log
+ */
+const express   = require('express');
+const router    = express.Router();
+const bcrypt    = require('bcryptjs');
+const jwt       = require('jsonwebtoken');
+const db        = require('../database/db');
+const { JWT_SECRET }  = require('../middleware/auth');
+const { loginLimiter, auditLog } = require('../middleware/security');
 
-router.post('/login', async (req, res, next) => {
+// In-memory login attempt tracker (resets on restart — basta para proteção básica)
+// Para produção de alta escala, use Redis
+const loginAttempts = new Map();
+
+function getAttempts(key) {
+  const entry = loginAttempts.get(key) || { count: 0, lockedUntil: 0 };
+  return entry;
+}
+
+function recordAttempt(key, success) {
+  const entry = getAttempts(key);
+  if (success) {
+    loginAttempts.delete(key);
+    return;
+  }
+  entry.count = (entry.count || 0) + 1;
+  // Lock for 15 min after 5 failures
+  if (entry.count >= 5) {
+    entry.lockedUntil = Date.now() + 15 * 60 * 1000;
+  }
+  loginAttempts.set(key, entry);
+}
+
+// ── POST /api/auth/login ──────────────────────────────────────────
+router.post('/login', loginLimiter, async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
@@ -14,17 +42,46 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ error: 'Usuário e senha obrigatórios' });
     }
 
-    const user = await db.get('SELECT * FROM users WHERE username = ?', [username]);
-    if (!user) {
-      return res.status(401).json({ error: 'Credenciais inválidas' });
+    // Sanitize
+    const cleanUser = String(username).slice(0, 64).trim();
+
+    // Check brute force lock
+    const attemptKey = `${req.ip}:${cleanUser}`;
+    const attempts   = getAttempts(attemptKey);
+    if (attempts.lockedUntil && Date.now() < attempts.lockedUntil) {
+      const remaining = Math.ceil((attempts.lockedUntil - Date.now()) / 60000);
+      await auditLog(null, cleanUser, 'login_blocked', 'auth', `Conta bloqueada temporariamente`, req);
+      return res.status(429).json({
+        error: `Conta bloqueada por excesso de tentativas. Aguarde ${remaining} minuto(s).`
+      });
     }
 
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return res.status(401).json({ error: 'Credenciais inválidas' });
+    // Fetch user — timing-safe (sempre faz bcrypt mesmo se não existe)
+    const user = await db.get('SELECT * FROM users WHERE username = $1', [cleanUser]);
+
+    // Always run bcrypt to prevent timing attacks
+    const dummyHash = '$2b$10$dummyhashtopreventtimingattacksXXXXXXXXXXXX';
+    const valid = user
+      ? await bcrypt.compare(String(password).slice(0, 128), user.password)
+      : await bcrypt.compare('dummy', dummyHash).then(() => false);
+
+    if (!user || !valid) {
+      recordAttempt(attemptKey, false);
+      const entry = getAttempts(attemptKey);
+      const remaining = Math.max(0, 5 - entry.count);
+      await auditLog(user?.id, cleanUser, 'login_failed', 'auth',
+        `IP: ${req.ip} — tentativa ${entry.count}/5`, req);
+      return res.status(401).json({
+        error: remaining > 0
+          ? `Credenciais inválidas. ${remaining} tentativa(s) restante(s).`
+          : 'Conta bloqueada temporariamente.'
+      });
     }
 
-    // Busca plano do usuário
+    // Success
+    recordAttempt(attemptKey, true);
+
+    // Get plan info
     const userPlan = await db.get(`
       SELECT p.name as plan_name, p.max_tvs,
              COALESCE(u.max_tvs_override, p.max_tvs, 0) as effective_max_tvs
@@ -34,8 +91,10 @@ router.post('/login', async (req, res, next) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: '24h' }
+      { algorithm: 'HS256', expiresIn: '24h' }
     );
+
+    await auditLog(user.id, user.username, 'login_success', 'auth', `IP: ${req.ip}`, req);
 
     res.json({
       token,
@@ -49,25 +108,37 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
+// ── POST /api/auth/change-password ───────────────────────────────
 router.post('/change-password', async (req, res, next) => {
   try {
-    const { currentPassword, newPassword } = req.body;
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-
     if (!token) return res.status(401).json({ error: 'Não autorizado' });
 
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await db.get('SELECT * FROM users WHERE id = ?', [decoded.id]);
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+    const user    = await db.get('SELECT * FROM users WHERE id = $1', [decoded.id]);
+    if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
 
-    const valid = await bcrypt.compare(currentPassword, user.password);
-    if (!valid) return res.status(401).json({ error: 'Senha atual incorreta' });
+    const { currentPassword, newPassword } = req.body;
 
-    if (newPassword.length < 6) return res.status(400).json({ error: 'Nova senha deve ter ao menos 6 caracteres' });
+    const valid = await bcrypt.compare(String(currentPassword).slice(0,128), user.password);
+    if (!valid) {
+      await auditLog(user.id, user.username, 'password_change_failed', 'auth', 'Senha atual incorreta', req);
+      return res.status(401).json({ error: 'Senha atual incorreta' });
+    }
 
-    const hash = await bcrypt.hash(newPassword, 10);
-    await db.run('UPDATE users SET password = ? WHERE id = ?', [hash, user.id]);
+    // Password policy: min 8 chars, at least 1 number or special char
+    const pwd = String(newPassword);
+    if (pwd.length < 8) {
+      return res.status(400).json({ error: 'A nova senha deve ter pelo menos 8 caracteres.' });
+    }
+    if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) {
+      return res.status(400).json({ error: 'A senha deve conter ao menos um número ou caractere especial.' });
+    }
+
+    const hash = await bcrypt.hash(pwd, 12); // cost factor 12
+    await db.run('UPDATE users SET password = $1 WHERE id = $2', [hash, user.id]);
+    await auditLog(user.id, user.username, 'password_changed', 'auth', null, req);
 
     res.json({ success: true });
   } catch (error) {
