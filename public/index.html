@@ -460,7 +460,7 @@ function LoginPage({onLogin}) {
     if(e?.key&&e.key!=='Enter')return;
     setLoading(true);setErr('');
     const r=await api.login(u,p);
-    if(r.token){TOKEN=r.token;localStorage.setItem('smartvision_token',r.token);onLogin(r.username);}
+    if(r.token){TOKEN=r.token;localStorage.setItem('smartvision_token',r.token);onLogin(r.username,r.role);}
     else setErr(r.error||'Credenciais inválidas');
     setLoading(false);
   };
@@ -592,7 +592,8 @@ const NAV=[
   {id:'settings',icon:'🎨',label:'Aparência'},
 ];
 
-function Sidebar({page,setPage,logout,username,reloadTVs,reloading,tvs=[]}){
+function Sidebar({page,setPage,logout,username,userRole,reloadTVs,reloading,tvs=[]}){
+  const isAdmin = userRole === 'admin';
   const online=(tvs||[]).filter(t=>t.status==='online').length;
   const total=(tvs||[]).length;
 
@@ -608,13 +609,17 @@ function Sidebar({page,setPage,logout,username,reloadTVs,reloading,tvs=[]}){
     ]},
     {label:'Recursos',items:[
       {id:'widgets',icon:'⊹',label:'Widgets'},
-      {id:'sponsors',icon:'◈',label:'Patrocinadores'},
-      {id:'emergency',icon:'⚡',label:'Emergência'},
+      ...(isAdmin?[
+        {id:'sponsors',icon:'◈',label:'Patrocinadores'},
+        {id:'emergency',icon:'⚡',label:'Emergência'},
+      ]:[]),
     ]},
     {label:'Sistema',items:[
-      {id:'plans',icon:'◈',label:'Planos'},
-      {id:'reports',icon:'↗',label:'Relatórios'},
-      {id:'users',icon:'◎',label:'Usuários'},
+      ...(isAdmin?[
+        {id:'plans',icon:'◈',label:'Planos'},
+        {id:'users',icon:'◎',label:'Usuários'},
+        {id:'reports',icon:'↗',label:'Relatórios'},
+      ]:[]),
       {id:'settings',icon:'⚙',label:'Aparência'},
     ]},
   ];
@@ -747,6 +752,7 @@ function MobileDrawer({page,setPage,logout,username,reloadTVs,reloading,theme={}
 function App(){
   const [loggedIn,setLoggedIn]=useState(!!TOKEN);
   const [username,setUsername]=useState(()=>{try{const t=TOKEN&&JSON.parse(atob(TOKEN.split('.')[1]));return t?.username||''}catch{return ''}});
+  const [userRole,setUserRole]=useState(()=>{try{const t=TOKEN&&JSON.parse(atob(TOKEN.split('.')[1]));return t?.role||'operator'}catch{return 'operator'}});
   const [page,setPage]=useState('dashboard');
   const [data,setData]=useState({tvs:[],videos:[],playlists:[],schedules:[],widgets:[],emergency:{active:0},sponsors:{sponsors:[],config:{}}});
   const [toast,setToast]=useState(null);
@@ -806,7 +812,7 @@ function App(){
   useEffect(()=>{if(!loggedIn)return;const t=setInterval(load,20000);return()=>clearInterval(t);},[loggedIn,load]);
 
   const logout=()=>{TOKEN='';localStorage.removeItem('smartvision_token');setLoggedIn(false);};
-  const onLogin=u=>{setLoggedIn(true);setUsername(u);};
+  const onLogin=(u,role)=>{setLoggedIn(true);setUsername(u);setUserRole(role||'operator');};
 
   const reloadTVs=async(tvId=null)=>{
     setReloading(tvId||'all');
@@ -819,13 +825,13 @@ function App(){
 
   if(!loggedIn) return <LoginPage onLogin={onLogin}/>;
 
-  const props={...data,onUpdate:load,showToast,reloadTVs,theme,setTheme,loadSettings};
+  const props={...data,onUpdate:load,showToast,reloadTVs,theme,setTheme,loadSettings,userRole,isAdmin:userRole==='admin'};
   const PAGE_LABELS={'dashboard':'Dashboard','tvs':'TVs','videos':'Mídias','playlists':'Playlists','schedules':'Agendamentos','widgets':'Widgets','emergency':'Emergência','sponsors':'Patrocinadores','reports':'Relatórios','users':'Usuários','plans':'Planos de Uso','settings':'Aparência'};
   const onlineTvs=(data.tvs||[]).filter(t=>t.status==='online').length;
 
   return (
     <div style={{display:'flex',height:'100vh',overflow:'hidden',background:'#F5F7FA'}}>
-      <Sidebar page={page} setPage={setPage} logout={logout} username={username} reloadTVs={reloadTVs} reloading={reloading} tvs={data.tvs||[]}/>
+      <Sidebar page={page} setPage={setPage} logout={logout} username={username} userRole={userRole} reloadTVs={reloadTVs} reloading={reloading} tvs={data.tvs||[]}/>
       <div id="main-content" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
         {/* ── TOP HEADER ── */}
         <div id="top-header" style={{background:'rgba(255,255,255,.92)',borderBottom:'1px solid #E2E8F0'}}>
@@ -858,11 +864,12 @@ function App(){
           {page==='playlists'  && <PlaylistsPage  {...props}/>}
           {page==='schedules'  && <SchedulesPage  {...props}/>}
           {page==='widgets'    && <WidgetsPage    {...props}/>}
-          {page==='emergency'  && <EmergencyPage  {...props}/>}
-          {page==='sponsors'   && <SponsorsPage   {...props}/>}
-          {page==='reports'    && <ReportsPage    {...props}/>}
-          {page==='users'      && <UsersPage      {...props}/>}
-          {page==='plans'      && <PlansPage      {...props}/>}
+
+          {page==='users'      && userRole==='admin' && <UsersPage      {...props}/>}
+          {page==='plans'      && userRole==='admin' && <PlansPage      {...props}/>}
+          {page==='reports'    && userRole==='admin' && <ReportsPage    {...props}/>}
+          {page==='sponsors'   && userRole==='admin' && <SponsorsPage   {...props}/>}
+          {page==='emergency'  && userRole==='admin' && <EmergencyPage  {...props}/>}
           {page==='settings'   && <AppearancePage {...props}/>}
         </div>
       </div>
@@ -877,7 +884,7 @@ function App(){
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────────
-function DashboardPage({tvs,playlists,schedules,videos,setPage}){
+function DashboardPage({tvs,playlists,schedules,videos,setPage,isAdmin,userRole}){
   const [stats,setStats]=useState(null);
   const [liveStatus,setLiveStatus]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -893,8 +900,17 @@ function DashboardPage({tvs,playlists,schedules,videos,setPage}){
     });
   },[]);
 
-  const onlineCount=liveStatus.filter(t=>t.status==='online').length;
-  const offlineCount=liveStatus.filter(t=>t.status==='offline').length;
+  // Filtra liveStatus para mostrar apenas TVs do usuário (não-admin)
+  const filteredTvs = React.useMemo(()=>{
+    if(!isAdmin && tvs && tvs.length >= 0) {
+      const myIds = new Set((tvs||[]).map(t=>t.id));
+      return liveStatus.filter(t=>myIds.has(t.id));
+    }
+    return liveStatus;
+  },[liveStatus,tvs,isAdmin]);
+
+  const onlineCount=filteredTvs.filter(t=>t.status==='online').length;
+  const offlineCount=filteredTvs.filter(t=>t.status==='offline').length;
   const activeScheds=schedules.filter(s=>s.active).length;
   const now=new Date();
   const h=now.getHours();
@@ -941,7 +957,7 @@ function DashboardPage({tvs,playlists,schedules,videos,setPage}){
               <div style={{fontSize:11.5,color:'#94A3B8',marginTop:1}}>Status atualizado em tempo real</div>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
-              {liveStatus.length>0&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'#EFF6FF',color:'#2563EB',border:'1px solid #BFDBFE',fontWeight:600}}>{liveStatus.length} TVs</span>}
+              {filteredTvs.length>0&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'#EFF6FF',color:'#2563EB',border:'1px solid #BFDBFE',fontWeight:600}}>{filteredTvs.length} TVs</span>}
               <button onClick={()=>setPage('tvs')} style={{fontSize:12,color:'#0066FF',background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:'4px 8px',borderRadius:6,transition:'background .15s'}}
                 onMouseEnter={e=>e.currentTarget.style.background='#EFF6FF'}
                 onMouseLeave={e=>e.currentTarget.style.background='none'}>
@@ -950,21 +966,21 @@ function DashboardPage({tvs,playlists,schedules,videos,setPage}){
             </div>
           </div>
           <div style={{maxHeight:360,overflowY:'auto'}}>
-            {loading&&[1,2,3,4].map(i=>(
+            {loading&&[1,2,3].map(i=>(
               <div key={i} style={{padding:'13px 18px',borderBottom:'1px solid #F1F5F9',display:'flex',gap:12,alignItems:'center'}}>
                 <div className="skeleton" style={{width:7,height:7,borderRadius:'50%',flexShrink:0}}/>
                 <div style={{flex:1}}><div className="skeleton" style={{height:12,marginBottom:5,width:'55%'}}/><div className="skeleton" style={{height:10,width:'35%'}}/></div>
                 <div className="skeleton" style={{width:52,height:20,borderRadius:10}}/>
               </div>
             ))}
-            {!loading&&liveStatus.length===0&&(
+            {!loading&&filteredTvs.length===0&&(
               <div style={{padding:'40px',textAlign:'center',color:'#94A3B8'}}>
                 <div style={{fontSize:32,marginBottom:8}}>📺</div>
                 <div style={{fontWeight:500}}>Nenhuma TV cadastrada</div>
                 <button onClick={()=>setPage('tvs')} style={{marginTop:10,fontSize:12,color:'#0066FF',background:'none',border:'none',cursor:'pointer',fontWeight:600}}>Adicionar TV →</button>
               </div>
             )}
-            {!loading&&liveStatus.map((tv,i)=>(
+            {!loading&&filteredTvs.map((tv,i)=>(
               <div key={tv.id}
                 style={{padding:'12px 18px',borderBottom:'1px solid #F8FAFC',display:'flex',alignItems:'center',gap:12,cursor:'pointer',transition:'background .12s'}}
                 onClick={()=>setPage('tvs')}

@@ -4,12 +4,11 @@ const db      = require('../database/db');
 
 // Status de todas as TVs em tempo real
 router.get('/status', async (req, res) => {
-  const tvs = await db.all(`
-    SELECT t.id, t.name, t.status, t.last_seen, t.current_video, t.playlist_id,
-           p.name as playlist_name
-    FROM tvs t LEFT JOIN playlists p ON t.playlist_id = p.id
-    ORDER BY t.name
-  `);
+  const { tenantFilter } = require('../middleware/tenant');
+  const { isAdmin, userId } = tenantFilter(req);
+  const tvs = isAdmin
+    ? await db.all(`SELECT t.id, t.name, t.status, t.last_seen, t.current_video, t.playlist_id, p.name as playlist_name FROM tvs t LEFT JOIN playlists p ON t.playlist_id = p.id ORDER BY t.name`)
+    : await db.all(`SELECT t.id, t.name, t.status, t.last_seen, t.current_video, t.playlist_id, p.name as playlist_name FROM tvs t LEFT JOIN playlists p ON t.playlist_id = p.id WHERE t.user_id = ? ORDER BY t.name`, [userId]);
   // Marcar como offline se não enviou heartbeat nos últimos 2 minutos
   const now = Date.now();
   const result = tvs.map(tv => {
@@ -37,7 +36,7 @@ router.get('/playback', async (req, res) => {
 router.get('/stats', async (req, res) => {
   const [tvCount, onlineCount, totalPlays, topMedia] = await Promise.all([
     db.get('SELECT COUNT(*) as n FROM tvs'),
-    db.get(`SELECT COUNT(*) as n FROM tvs WHERE last_seen >= NOW() - INTERVAL '2 minutes'`),
+    db.get(isAdmin ? `SELECT COUNT(*) as n FROM tvs WHERE last_seen >= NOW() - INTERVAL '2 minutes'` : `SELECT COUNT(*) as n FROM tvs WHERE last_seen >= NOW() - INTERVAL '2 minutes' AND user_id = $1`, isAdmin ? [] : [userId]),
     db.get(`SELECT COUNT(*) as n FROM playback_log WHERE started_at >= NOW() - INTERVAL '24 hours'`),
     db.all(`SELECT video_name, COUNT(*) as plays FROM playback_log
             WHERE started_at >= NOW() - INTERVAL '7 days' AND video_name IS NOT NULL
