@@ -918,7 +918,8 @@ function DashboardPage({tvs,playlists,schedules,videos,setPage}){
   const offlineCount=liveStatus.filter(t=>t.status==='offline').length;
   const activeScheds=schedules.filter(s=>s.active).length;
   const now=new Date();
-  const greeting=now.getHours()<12?'Bom dia':'now.getHours()<18?'Boa tarde':'Boa noite';
+  const h=now.getHours();
+  const greeting=h<12?'Bom dia':h<18?'Boa tarde':'Boa noite';
 
   return (
     <div className="fadein page-content">
@@ -926,10 +927,10 @@ function DashboardPage({tvs,playlists,schedules,videos,setPage}){
       <div style={{marginBottom:28,display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
         <div>
           <h2 className="page-title" style={{fontSize:24,marginBottom:6}}>
-            {now.getHours()<12?'Bom dia, ':'now.getHours()<18?'Boa tarde, ':'Boa noite, '}{' '}
+            {greeting}{', '}
             <span style={{background:'linear-gradient(135deg,var(--blue2),var(--cyan))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>Dashboard</span>
           </h2>
-          <p className="page-sub">Monitoramento em tempo real · {new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</p>
+          <p className="page-sub">Monitoramento em tempo real · {now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</p>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <div style={{display:'flex',alignItems:'center',gap:6,background:'var(--green-soft)',border:'1px solid rgba(0,217,126,.22)',borderRadius:20,padding:'6px 14px'}}>
