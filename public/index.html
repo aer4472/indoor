@@ -600,89 +600,53 @@ footer{
   </div>
 
   <!-- TV 3D -->
-  <div class="hero-tv-wrap anim-s" id="tvWrap">
-    <div id="tv3d" style="transform-style:preserve-3d;transition:transform 1s cubic-bezier(.22,1,.36,1)">
-      <div class="tv-frame">
-        <div class="tv-cam-bar"><div class="tv-cam"></div></div>
-        <div class="tv-screen-outer" id="tvScr">
+  <!-- VIDEO DEMO -->
+<div class="anim-s" style="width:100%;max-width:900px;margin:0 auto 0;position:relative;z-index:1;">
 
-          <!-- Slide A -->
-          <div class="tv-slide on" id="sl0">
-            <div class="s-dash">
-              <div class="top">
-                <div class="brand">SmartVision Pro</div>
-                <div class="clk" id="hClock">--:--</div>
-              </div>
-              <div class="s-kpis">
-                <div class="kpi"><span class="kpi-v" style="color:var(--green)">14</span><div class="kpi-l">Online</div></div>
-                <div class="kpi"><span class="kpi-v" style="color:var(--red)">2</span><div class="kpi-l">Offline</div></div>
-                <div class="kpi"><span class="kpi-v" style="color:var(--blue3)">47</span><div class="kpi-l">Mídias</div></div>
-                <div class="kpi"><span class="kpi-v" style="color:var(--amber)">6</span><div class="kpi-l">Playlists</div></div>
-              </div>
-              <div class="s-tvlist">
-                <div class="stv on"><div class="stv-n">Recepção</div><div class="stv-s"><div class="sdot sdot-g"></div><span style="font-size:8px;color:var(--green)">Online</span></div></div>
-                <div class="stv on"><div class="stv-n">Refeitório</div><div class="stv-s"><div class="sdot sdot-g"></div><span style="font-size:8px;color:var(--green)">Online</span></div></div>
-                <div class="stv on"><div class="stv-n">Auditório</div><div class="stv-s"><div class="sdot sdot-g"></div><span style="font-size:8px;color:var(--green)">Online</span></div></div>
-                <div class="stv off"><div class="stv-n">Diretoria</div><div class="stv-s"><div class="sdot sdot-r"></div><span style="font-size:8px;color:var(--red)">Offline</span></div></div>
-                <div class="stv on"><div class="stv-n">Corredor A</div><div class="stv-s"><div class="sdot sdot-g"></div><span style="font-size:8px;color:var(--green)">Online</span></div></div>
-                <div class="stv on"><div class="stv-n">Loja Centro</div><div class="stv-s"><div class="sdot sdot-g"></div><span style="font-size:8px;color:var(--green)">Online</span></div></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Slide B -->
-          <div class="tv-slide" id="sl1">
-            <div class="s-play">
-              <div class="s-play-bg"></div>
-              <div style="position:absolute;inset:0;background:radial-gradient(circle at 70% 30%,rgba(37,99,235,.12),transparent 60%)"></div>
-              <div class="s-play-overlay"></div>
-              <div class="s-play-bars">
-                <div class="spb-label">▶ Reproduzindo agora</div>
-                <div class="spb-title">Campanha Verão 2025</div>
-                <div class="spb-bar"><div class="spb-fill"></div></div>
-                <div class="spb-meta"><span>01:24</span><span>Playlist: Promoções</span><span>02:30</span></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Slide C -->
-          <div class="tv-slide" id="sl2">
-            <div class="s-widget">
-              <div class="sw-time" id="wClock">--:--:--</div>
-              <div class="sw-date" id="wDate">—</div>
-              <div class="sw-weather">
-                <div class="sww"><div class="sww-icon">☀️</div><div class="sww-t" style="color:var(--amber)">29°</div><div class="sww-d">Hoje</div></div>
-                <div class="sww"><div class="sww-icon">⛅</div><div class="sww-t">26°</div><div class="sww-d">Amanhã</div></div>
-                <div class="sww"><div class="sww-icon">🌧</div><div class="sww-t" style="color:var(--cyan)">22°</div><div class="sww-d">Segunda</div></div>
-              </div>
-              <div class="sw-ticker">
-                <div class="sw-ticker-inner">
-                  <span>📢 Reunião de equipe — Sala 3 — 15h00</span>
-                  <span>🎉 Bem-vindos ao SmartVision Pro</span>
-                  <span>📋 Novo conteúdo publicado para todas as TVs</span>
-                  <span>📢 Reunião de equipe — Sala 3 — 15h00</span>
-                  <span>🎉 Bem-vindos ao SmartVision Pro</span>
-                  <span>📋 Novo conteúdo publicado para todas as TVs</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
+  <!-- Browser chrome frame -->
+  <div style="background:linear-gradient(155deg,#1A2540 0%,#111929 100%);border-radius:18px;padding:12px 12px 12px;border:1px solid rgba(255,255,255,.09);box-shadow:0 50px 80px rgba(0,0,0,.7),0 0 60px rgba(37,99,235,.18),0 -1px 0 rgba(255,255,255,.06) inset;">
+    <!-- Top bar -->
+    <div style="height:32px;background:#0D1422;border-radius:8px 8px 0 0;display:flex;align-items:center;padding:0 12px;gap:6px;margin-bottom:0;border-bottom:1px solid rgba(255,255,255,.06);">
+      <div style="width:9px;height:9px;border-radius:50%;background:#FF5F56;flex-shrink:0"></div>
+      <div style="width:9px;height:9px;border-radius:50%;background:#FFBD2E;flex-shrink:0"></div>
+      <div style="width:9px;height:9px;border-radius:50%;background:#27C93F;flex-shrink:0"></div>
+      <div style="flex:1;background:rgba(255,255,255,.06);border-radius:5px;height:18px;margin:0 10px;display:flex;align-items:center;padding:0 10px;gap:5px;">
+        <span style="font-size:9px;color:rgba(255,255,255,.3)">🔒</span>
+        <span style="font-size:9px;color:rgba(255,255,255,.3);font-family:'Plus Jakarta Sans',sans-serif">app.smartvisionpro.com.br — Demonstração</span>
       </div>
-      <div class="tv-neck"></div>
-      <div class="tv-foot"></div>
     </div>
 
-    <!-- Floating badges -->
-    <div class="tv-badges">
-      <div class="tvb b4"><div class="bvdot" style="background:#EF4444;animation:pulse 1s ease infinite"></div>AO VIVO</div>
-      <div class="tvb b1"><div class="bvdot" style="background:var(--green)"></div>14 TVs Online</div>
-      <div class="tvb b2"><div class="bvdot" style="background:var(--blue3)"></div>Sincronização automática</div>
-      <div class="tvb b3"><div class="bvdot" style="background:var(--amber)"></div>47 conteúdos ativos</div>
+    <!-- YouTube embed -->
+    <div style="position:relative;aspect-ratio:16/9;background:#000;border-radius:0 0 8px 8px;overflow:hidden;">
+      <iframe
+        id="demoVideo"
+        src="https://www.youtube.com/embed/fDkoO2ZuyBQ?start=71&rel=0&modestbranding=1&color=white"
+        title="SmartVision Pro — Demonstração do sistema"
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen
+        style="position:absolute;inset:0;width:100%;height:100%;border:none;">
+      </iframe>
     </div>
   </div>
-</section>
+
+  <!-- Glow under frame -->
+  <div style="position:absolute;bottom:-30px;left:10%;right:10%;height:50px;background:radial-gradient(ellipse at center,rgba(37,99,235,.3) 0%,transparent 70%);filter:blur(18px);pointer-events:none;"></div>
+
+  <!-- Floating badges -->
+  <div style="position:absolute;top:18%;right:-14px;padding:7px 14px;border-radius:100px;background:rgba(10,14,26,.88);border:1px solid rgba(255,255,255,.12);font-size:11px;font-weight:700;display:flex;align-items:center;gap:7px;backdrop-filter:blur(12px);animation:float 3.8s ease-in-out infinite;">
+    <div style="width:7px;height:7px;border-radius:50%;background:#10B981;flex-shrink:0"></div>
+    14 TVs Online
+  </div>
+  <div style="position:absolute;top:48%;left:-22px;padding:7px 14px;border-radius:100px;background:rgba(10,14,26,.88);border:1px solid rgba(255,255,255,.12);font-size:11px;font-weight:700;display:flex;align-items:center;gap:7px;backdrop-filter:blur(12px);animation:float 4.2s ease-in-out infinite .6s;">
+    <div style="width:7px;height:7px;border-radius:50%;background:#3B82F6;flex-shrink:0"></div>
+    Sync em tempo real
+  </div>
+  <div style="position:absolute;bottom:22%;right:2%;padding:7px 14px;border-radius:100px;background:rgba(10,14,26,.88);border:1px solid rgba(255,255,255,.12);font-size:11px;font-weight:700;display:flex;align-items:center;gap:7px;backdrop-filter:blur(12px);animation:float 3.5s ease-in-out infinite 1.2s;">
+    <div style="width:7px;height:7px;border-radius:50%;background:#F59E0B;flex-shrink:0"></div>
+    47 conteúdos ativos
+  </div>
+</div>
 
 <!-- STATS -->
 <div class="stats">
