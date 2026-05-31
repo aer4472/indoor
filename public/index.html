@@ -1098,7 +1098,7 @@ function TVsPage({tvs,playlists,onUpdate,showToast,reloadTVs}){
   const [modal,setModal]=useState(false);const [edit,setEdit]=useState(null);
   const [form,setForm]=useState({name:'',orientation:'horizontal',playlist_id:'',volume:100,transition:'fade'});
   const [previewTv,setPreviewTv]=useState(null);
-  const [tvSelected,setTvSelected]=useState(new Set());
+  const [tvSelected,setTvSelected]=useState(()=>new Set());
   const [tvSelectMode,setTvSelectMode]=useState(false);
   const toggleTvSel=id=>setTvSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
   const clearTvSel=()=>{setTvSelected(new Set());setTvSelectMode(false);};
@@ -1193,7 +1193,7 @@ function TVsPage({tvs,playlists,onUpdate,showToast,reloadTVs}){
               <button onClick={()=>del(tv.id)} className="text-xs text-red-400 border border-gray-200 hover:border-red-300 px-2.5 py-1.5 rounded-lg transition">🗑</button>
             </div>
           </div>
-        );})
+        );})}  
         {tvs.length===0&&<div className="col-span-3 text-center py-16 text-gray-400"><div className="text-4xl mb-3">📺</div><p>Nenhuma TV cadastrada</p><button onClick={()=>open()} className="mt-2 text-blue-500 text-sm">Criar agora</button></div>}
       </div>
 
@@ -1259,7 +1259,7 @@ function VideosPage({videos,onUpdate,showToast}){
   const [editV,setEditV]=useState(null);const [editName,setEditName]=useState('');const [editDur,setEditDur]=useState(10);const [editRot,setEditRot]=useState(0);
   const [showYt,setShowYt]=useState(false);const [ytUrl,setYtUrl]=useState('');const [ytName,setYtName]=useState('');
   const [dragOver,setDragOver]=useState(false);const [filter,setFilter]=useState('all');
-  const [selected,setSelected]=useState(new Set());
+  const [selected,setSelected]=useState(()=>new Set());
   const [selectMode,setSelectMode]=useState(false);
   const toggleSelect=id=>setSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
   const selectAll=ids=>{setSelected(new Set(ids));};
@@ -1279,11 +1279,11 @@ function VideosPage({videos,onUpdate,showToast}){
   const [fbDrives,setFbDrives]=useState([]);const [fbPath,setFbPath]=useState(null);
   const [fbData,setFbData]=useState(null);const [fbLoading,setFbLoading]=useState(false);
   // fbSelected: Set de paths de arquivos individuais selecionados
-  const [fbSelected,setFbSelected]=useState(new Set());
+  const [fbSelected,setFbSelected]=useState(()=>new Set());
   // fbSelFolders: Set de paths de pastas selecionadas (inteiras)
-  const [fbSelFolders,setFbSelFolders]=useState(new Set());
+  const [fbSelFolders,setFbSelFolders]=useState(()=>new Set());
   const [fbImporting,setFbImporting]=useState(false);
-  const [fbScanLoading,setFbScanLoading]=useState(new Set()); // pastas em scan
+  const [fbScanLoading,setFbScanLoading]=useState(()=>new Set()); // pastas em scan
 
   const fbOpen=async()=>{
     try{
@@ -1721,7 +1721,7 @@ function CityVerifier({cardForm, setCardForm}){
 }
 
 function PlaylistsPage({playlists,videos,onUpdate,showToast}){
-  const [plSelected,setPlSelected]=useState(new Set());
+  const [plSelected,setPlSelected]=useState(()=>new Set());
   const [plSelectMode,setPlSelectMode]=useState(false);
   const togglePlSel=id=>setPlSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
   const clearPlSel=()=>{setPlSelected(new Set());setPlSelectMode(false);};
