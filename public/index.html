@@ -200,27 +200,30 @@ tr:hover td { background:var(--bg3); }
 
 /* ── MODAL ── */
 .sv-modal-backdrop {
-  position:fixed;inset:0;z-index:1000;
-  background:rgba(15,23,42,.5);
-  backdrop-filter:blur(6px);
+  position:fixed;inset:0;z-index:9000;
+  background:rgba(15,23,42,.55);
+  backdrop-filter:blur(4px);
   display:flex;align-items:center;justify-content:center;padding:16px;
   animation:fadein .18s ease;
+  overflow-y:auto;
 }
 .sv-modal {
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:var(--r-xl);
-  box-shadow:var(--shadow-lg);
+  background:#FFFFFF;
+  border:1px solid #E2E8F0;
+  border-radius:16px;
+  box-shadow:0 20px 60px rgba(0,0,0,.15),0 4px 16px rgba(0,0,0,.08);
   width:100%;max-width:560px;
-  max-height:92vh;overflow:hidden;
+  max-height:88vh;
   display:flex;flex-direction:column;
+  margin:auto;
+  position:relative;
 }
-.sv-modal.wide { max-width:900px; }
+.sv-modal.wide { max-width:920px; }
 .sv-modal.xl   { max-width:1100px; }
-.sv-modal-header { display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid var(--border); }
-.sv-modal-title  { font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700; }
-.sv-modal-body   { padding:20px 24px;overflow-y:auto;flex:1; }
-.sv-modal-footer { padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end; }
+.sv-modal-header { display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid #E2E8F0;flex-shrink:0; }
+.sv-modal-title  { font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;color:#1E293B; }
+.sv-modal-body   { padding:20px 24px;overflow-y:auto;flex:1;min-height:0; }
+.sv-modal-footer { padding:16px 24px;border-top:1px solid #E2E8F0;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0; }
 
 /* ── NAV ACTIVE ── */
 .nav-active-indicator {
@@ -232,17 +235,17 @@ tr:hover td { background:var(--bg3); }
 
 /* ── TOP HEADER ── */
 #top-header {
-  position:sticky;top:0;z-index:100;
-  background:rgba(255,255,255,.9);
+  position:sticky;top:0;z-index:50;
+  background:rgba(255,255,255,.95);
   backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--border);
+  border-bottom:1px solid #E2E8F0;
   padding:0 24px;
   height:54px;
   display:flex;align-items:center;gap:16px;
 }
 
 /* ── PAGE CONTENT ── */
-.page-content { padding:24px; max-width:1440px; }
+.page-content { padding:24px; max-width:1440px; width:100%; }
 .page-title { font-family:'Plus Jakarta Sans',sans-serif; font-size:19px; font-weight:800; color:var(--text); margin:0 0 2px; letter-spacing:-.02em; }
 .page-sub   { font-size:12.5px; color:var(--text3); margin:0; }
 
@@ -299,8 +302,8 @@ tr:hover td { background:var(--bg3); }
 .text-red-400  { color:#F87171!important }
 .text-green-600{ color:#16A34A!important }
 .text-yellow-600{color:#D97706!important }
-.text-purple-800{color:#6D28D9!important }
-.text-purple-500{color:#8B5CF6!important }
+.{color:#6D28D9!important }
+.{color:#8B5CF6!important }
 .border-gray-100,.border-gray-200 { border-color:var(--border)!important }
 .border-gray-300{ border-color:var(--border2)!important }
 .divide-gray-100>*+* { border-color:var(--border)!important }
@@ -386,7 +389,7 @@ const DAYS=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 function Modal({title,onClose,onSave,children,wide,xl,saveLabel='Salvar',saveDanger=false,saving}) {
   return (
     <div className="sv-modal-backdrop" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <div className={`sv-modal fadein${wide||xl?' wide':''}`} style={xl?{maxWidth:1100}:{}}>
+      <div className={`sv-modal fadein${wide?' wide':xl?' wide xl':''}` } style={xl?{maxWidth:1100}:{}}>
         <div className="sv-modal-header">
           <div className="sv-modal-title">{title}</div>
           <button onClick={onClose} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',color:'#64748B',width:30,height:30,borderRadius:8,cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',transition:'all .2s'}}
@@ -411,12 +414,12 @@ function Modal({title,onClose,onSave,children,wide,xl,saveLabel='Salvar',saveDan
 }
 
 
-function Lbl({children}){return <label style={{display:'block',fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>{children}</label>;}
+function Lbl({children}){return <label style={{display:'block',fontSize:11.5,fontWeight:600,color:'#475569',marginBottom:6,letterSpacing:'.01em'}}>{children}</label>;}
 function Inp({value,onChange,placeholder,type='text',disabled=false}){
-  return <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{width:'100%',padding:'10px 14px',display:'block',opacity:disabled?.5:1}}/>;
+  return <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{width:'100%',padding:'9px 12px',display:'block',marginBottom:12,borderRadius:8,border:'1px solid #CBD5E1',background:disabled?'#F8FAFC':'#fff',color:'#1E293B',fontSize:13,fontFamily:"'Inter',sans-serif",opacity:disabled?.7:1}}/>;
 }
 function Sel({value,onChange,children,className=''}){
-  return <select value={value} onChange={e=>onChange(e.target.value)} className={`w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm bg-white ${className}`}>{children}</select>;
+  return <select value={value} onChange={e=>onChange(e.target.value)} style={{width:'100%',padding:'9px 12px',marginBottom:12,borderRadius:8,border:'1px solid #CBD5E1',background:'#fff',color:'#1E293B',fontSize:13,fontFamily:"'Inter',sans-serif"}} className={className}>{children}</select>;
 }
 function StatCard({icon,label,value,sub,color='blue',onClick,trend}){
   const C={
@@ -626,7 +629,7 @@ function Sidebar({page,setPage,logout,username,userRole,userPlan,reloadTVs,reloa
   ];
 
   return (
-    <div id="sidebar" style={{width:216,display:'flex',flexDirection:'column',flexShrink:0,background:'#fff',borderRight:'1px solid #E2E8F0',height:'100vh',position:'sticky',top:0,overflow:'hidden',boxShadow:'1px 0 0 #E2E8F0'}}>
+    <div id="sidebar" style={{width:216,display:'flex',flexDirection:'column',flexShrink:0,background:'#fff',borderRight:'1px solid #E2E8F0',height:'100vh',position:'sticky',top:0,overflow:'hidden',boxShadow:'1px 0 0 #E2E8F0',zIndex:10}}>
 
       {/* Logo */}
       <div style={{padding:'16px 16px 12px',borderBottom:'1px solid #E2E8F0'}}>
@@ -836,7 +839,7 @@ function App(){
   return (
     <div style={{display:'flex',height:'100vh',overflow:'hidden',background:'#F5F7FA'}}>
       <Sidebar page={page} setPage={setPage} logout={logout} username={username} userRole={userRole} userPlan={userPlan} reloadTVs={reloadTVs} reloading={reloading} tvs={data.tvs||[]}/>
-      <div id="main-content" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
+      <div id="main-content" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,position:'relative'}}>
         {/* ── TOP HEADER ── */}
         <div id="top-header" style={{background:'rgba(255,255,255,.92)',borderBottom:'1px solid #E2E8F0'}}>
           <div style={{flex:1,display:'flex',alignItems:'center',gap:8,minWidth:0}}>
@@ -861,7 +864,7 @@ function App(){
           </div>
         </div>
         {/* ── PAGE CONTENT ── */}
-        <div style={{flex:1,overflowY:'auto'}}>
+        <div style={{flex:1,overflowY:'auto',position:'relative'}}>
           {page==='dashboard'  && <DashboardPage  {...props} setPage={setPage}/>}
           {page==='tvs'        && <TVsPage        {...props}/>}
           {page==='videos'     && <VideosPage     {...props}/>}
@@ -1447,7 +1450,7 @@ function VideosPage({videos,onUpdate,showToast}){
       </div>
       {editV&&<Modal title="Editar Mídia" onClose={()=>setEditV(null)} onSave={saveEdit}>
         <Lbl>Nome</Lbl><Inp value={editName} onChange={setEditName}/>
-        {(editV.media_type==='image'||editV.media_type==='pdf')&&<><Lbl>Tempo de exibição (s)</Lbl><input type="number" min="3" max="300" value={editDur} onChange={e=>setEditDur(+e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/></>}
+        {(editV.media_type==='image'||editV.media_type==='pdf')&&<><Lbl>Tempo de exibição (s)</Lbl><input type="number" min="3" max="300" value={editDur} onChange={e=>setEditDur(+e.target.value)} style={{width:"100%",padding:"9px 12px",marginBottom:12,borderRadius:8,border:"1px solid #CBD5E1",background:"#fff",color:"#1E293B",fontSize:13}}/></>}
         <Lbl>Rotação individual na TV</Lbl>
           <p className="text-xs text-gray-400 mb-2">0° = sem rotação. Configure aqui a rotação individual desta mídia.</p>
           <div className="grid grid-cols-4 gap-2 mb-1">
@@ -1837,22 +1840,23 @@ function PlaylistsPage({playlists,videos,onUpdate,showToast}){
         </div>
 
         {/* Shuffle */}
-        <div className="flex items-center justify-between bg-purple-50 border border-purple-100 rounded-xl px-4 py-3 mb-3">
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:12,padding:'12px 16px',marginBottom:12}}>
           <div>
-            <p className="text-sm font-semibold text-purple-800">🔀 Reprodução aleatória</p>
-            <p className="text-xs text-purple-500 mt-0.5">Embaralha a ordem dos itens automaticamente</p>
+            <p style={{fontSize:13,fontWeight:600,color:'#6D28D9',margin:0}}>🔀 Reprodução aleatória</p>
+            <p style={{fontSize:11.5,color:'#8B5CF6',marginTop:2,marginBottom:0}}>Embaralha a ordem dos itens automaticamente</p>
           </div>
-          <button onClick={()=>setForm(f=>({...f,shuffle:!f.shuffle}))} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.shuffle?'bg-purple-600':'bg-gray-200'}`}>
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.shuffle?'translate-x-6':'translate-x-1'}`}/>
+          <button onClick={()=>setForm(f=>({...f,shuffle:!f.shuffle}))}
+            style={{width:44,height:24,borderRadius:12,border:'none',cursor:'pointer',padding:0,position:'relative',background:form.shuffle?'#7C3AED':'#CBD5E1',transition:'background .2s',flexShrink:0}}>
+            <span style={{position:'absolute',top:3,left:form.shuffle?22:3,width:18,height:18,borderRadius:'50%',background:'#fff',transition:'left .2s',boxShadow:'0 1px 3px rgba(0,0,0,.2)',display:'block'}}/>
           </button>
         </div>
 
         {/* Tabs: Mídia normal vs Cards especiais */}
-        <div className="flex gap-0 mb-3 border border-gray-200 rounded-lg overflow-hidden">
-          <button onClick={()=>setTab('media')} className={`flex-1 py-2 text-sm font-medium transition ${tab==='media'?'bg-blue-600 text-white':'bg-white text-gray-600 hover:bg-gray-50'}`}>
+        <div style={{display:'flex',marginBottom:12,border:'1px solid #E2E8F0',borderRadius:10,overflow:'hidden'}}>
+          <button onClick={()=>setTab('media')} style={{flex:1,padding:'9px 12px',fontSize:13,fontWeight:600,border:'none',cursor:'pointer',transition:'all .15s',background:tab==='media'?'#0066FF':'#fff',color:tab==='media'?'#fff':'#64748B'}}>
             🎬 Mídia ({normalMedia.filter(v=>!form.videoIds.includes(v.id)).length} disp.)
           </button>
-          <button onClick={()=>setTab('cards')} className={`flex-1 py-2 text-sm font-medium transition ${tab==='cards'?'bg-blue-600 text-white':'bg-white text-gray-600 hover:bg-gray-50'}`}>
+          <button onClick={()=>setTab('cards')} style={{flex:1,padding:'9px 12px',fontSize:13,fontWeight:600,border:'none',borderLeft:'1px solid #E2E8F0',cursor:'pointer',transition:'all .15s',background:tab==='cards'?'#0066FF':'#fff',color:tab==='cards'?'#fff':'#64748B'}}>
             ✨ Cards especiais
           </button>
         </div>
@@ -1977,7 +1981,7 @@ function PlaylistsPage({playlists,videos,onUpdate,showToast}){
           <div>
             <Lbl>Duração (segundos)</Lbl>
             <input type="number" min="5" max="300" value={cardForm._dur||15} onChange={e=>setCardForm(f=>({...f,_dur:+e.target.value}))}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/>
+              style={{width:"100%",padding:"9px 12px",marginBottom:12,borderRadius:8,border:"1px solid #CBD5E1",background:"#fff",color:"#1E293B",fontSize:13}}/>
           </div>
         </div>
 
@@ -2174,8 +2178,8 @@ function SchedulesPage({tvs,playlists,schedules,onUpdate,showToast}){
           <option value="">— Selecione —</option>{playlists.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
         </Sel>
         <div className="grid grid-cols-2 gap-2">
-          <div><Lbl>Início</Lbl><input type="time" value={form.start_time} onChange={e=>setForm(f=>({...f,start_time:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/></div>
-          <div><Lbl>Fim</Lbl><input type="time" value={form.end_time} onChange={e=>setForm(f=>({...f,end_time:e.target.value}))} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/></div>
+          <div><Lbl>Início</Lbl><input type="time" value={form.start_time} onChange={e=>setForm(f=>({...f,start_time:e.target.value}))} style={{width:"100%",padding:"9px 12px",marginBottom:12,borderRadius:8,border:"1px solid #CBD5E1",background:"#fff",color:"#1E293B",fontSize:13}}/></div>
+          <div><Lbl>Fim</Lbl><input type="time" value={form.end_time} onChange={e=>setForm(f=>({...f,end_time:e.target.value}))} style={{width:"100%",padding:"9px 12px",marginBottom:12,borderRadius:8,border:"1px solid #CBD5E1",background:"#fff",color:"#1E293B",fontSize:13}}/></div>
         </div>
         <Lbl>Dias da semana</Lbl>
         <div className="flex gap-1.5 flex-wrap mb-3">
@@ -2301,7 +2305,7 @@ function LogoWidgetConfig({config, onChange}) {
       <div>
         <Lbl>Largura (px)</Lbl>
         <input type="number" value={config.width||120} onChange={e=>set('width',+e.target.value)} min="40" max="600"
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/>
+          style={{width:"100%",padding:"9px 12px",marginBottom:12,borderRadius:8,border:"1px solid #CBD5E1",background:"#fff",color:"#1E293B",fontSize:13}}/>
       </div>
       <div>
         <Lbl>Opacidade: {Math.round((config.opacity??1)*100)}%</Lbl>
@@ -2390,7 +2394,7 @@ function WidgetConfigFields({type,config,onChange}){
 
   if(type==='countdown') return (<>
     <Lbl>Rótulo do evento</Lbl><Inp value={config.label||''} onChange={v=>set('label',v)} placeholder="Ex: Formatura 2025"/>
-    <Lbl>Data/hora do evento</Lbl><input type="datetime-local" value={config.target_date||''} onChange={e=>set('target_date',e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"/>
+    <Lbl>Data/hora do evento</Lbl><input type="datetime-local" value={config.target_date||''} onChange={e=>set('target_date',e.target.value)} style={{width:"100%",padding:"9px 12px",marginBottom:12,borderRadius:8,border:"1px solid #CBD5E1",background:"#fff",color:"#1E293B",fontSize:13}}/>
     <div className="grid grid-cols-2 gap-2">
       <div><Lbl>Cor</Lbl><input type="color" value={config.color||'#ffffff'} onChange={e=>set('color',e.target.value)} className="w-full h-10 rounded-lg border border-gray-200 cursor-pointer mb-3"/></div>
       <div><Lbl>Tamanho</Lbl><Sel value={config.widget_size||'md'} onChange={v=>set('widget_size',v)}>{WIDGET_SIZES.map(s=><option key={s.value} value={s.value}>{s.label}</option>)}</Sel></div>
