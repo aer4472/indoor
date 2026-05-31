@@ -216,7 +216,8 @@ router.post('/upload', upload.single('video'), async (req, res, next) => {
       duration = await getVideoDuration(filePath);
     }
 
-    const { userId: uploadUserId } = require('../middleware/tenant').tenantFilter(req);
+    const { userId: uploadUserId, isAdmin: uploadIsAdmin } = require('../middleware/tenant').tenantFilter(req);
+    console.log(`📤 Upload: user=${req.user?.username}(id=${req.user?.id}) role=${req.user?.role} → userId=${uploadUserId}`);
     await db.run(
       `INSERT INTO videos (id, filename, original_name, duration, display_duration, size, mime_type, media_type, user_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
