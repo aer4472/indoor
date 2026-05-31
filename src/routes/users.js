@@ -64,7 +64,7 @@ router.post('/', async (req, res, next) => {
       'INSERT INTO users (username, password, role, plan_id) VALUES (?,?,?,?)',
       [username, hash, role, plan_id || null]
     );
-    await db.run('INSERT INTO audit_log (user,action,target,detail) VALUES (?,?,?,?)',
+    await db.run('INSERT INTO audit_log ("user",action,target,detail) VALUES (?,?,?,?)',
       [req.user?.username||'admin','create_user',username,`role:${role}`]);
     const created = await db.get('SELECT id, username, role, plan_id FROM users WHERE id = $1', [r.id]);
     res.json(created);
@@ -97,7 +97,7 @@ router.put('/:id', async (req, res, next) => {
       'UPDATE users SET username=?,password=?,role=?,plan_id=?,max_tvs_override=? WHERE id=?',
       [newUsername, newHash, newRole, newPlanId, newOverride, req.params.id]
     );
-    await db.run('INSERT INTO audit_log (user,action,target) VALUES (?,?,?)',
+    await db.run('INSERT INTO audit_log ("user",action,target) VALUES (?,?,?)',
       [req.user?.username||'admin','update_user',newUsername]);
     const updated = await db.get(`
       SELECT u.id, u.username, u.role, u.plan_id, u.max_tvs_override,
