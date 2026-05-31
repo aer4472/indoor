@@ -15,389 +15,300 @@
   <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png">
   <title>SmartVision Pro — Painel</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
   <style>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700:wght@400;500;600;700;800&display=swap');
 
 :root {
-  /* Core palette */
-  --bg:          #070D18;
-  --bg2:         #0A1220;
-  --bg3:         #0F1929;
-  --bg4:         #141F2E;
-  --sidebar:     #060B15;
-  --border:      rgba(255,255,255,0.06);
-  --border2:     rgba(255,255,255,0.11);
-  --border3:     rgba(255,255,255,0.18);
+  --bg:        #F5F7FA;
+  --bg2:       #FFFFFF;
+  --bg3:       #F1F4F8;
+  --bg4:       #E8EDF4;
+  --sidebar:   #FFFFFF;
 
-  /* Text */
-  --text:        #E8EFFE;
-  --text2:       #7A8BA8;
-  --text3:       #3A4A60;
-  --text4:       #1E2D42;
+  --border:    #E2E8F0;
+  --border2:   #CBD5E1;
 
-  /* Brand */
-  --blue:        #0057FF;
-  --blue2:       #0099FF;
-  --blue3:       #00C6FF;
-  --blue-glow:   rgba(0,87,255,0.3);
-  --blue-soft:   rgba(0,87,255,0.12);
+  --text:      #1E293B;
+  --text2:     #64748B;
+  --text3:     #94A3B8;
+  --text4:     #CBD5E1;
 
-  /* Status */
-  --green:       #00D97E;
-  --green-soft:  rgba(0,217,126,0.12);
-  --red:         #FF3B5C;
-  --red-soft:    rgba(255,59,92,0.12);
-  --yellow:      #FFB800;
-  --yellow-soft: rgba(255,184,0,0.12);
-  --purple:      #8B5CF6;
-  --purple-soft: rgba(139,92,246,0.12);
-  --cyan:        #00E5FF;
+  --blue:      #0066FF;
+  --blue2:     #0099FF;
+  --blue-soft: #EFF6FF;
+  --blue-mid:  #DBEAFE;
 
-  /* Geometry */
-  --r:           10px;
-  --r-lg:        14px;
-  --r-xl:        18px;
+  --green:     #22C55E;
+  --green-soft:#F0FDF4;
+  --red:       #EF4444;
+  --red-soft:  #FEF2F2;
+  --yellow:    #F59E0B;
+  --yellow-soft:#FFFBEB;
+  --purple:    #8B5CF6;
+  --purple-soft:#F5F3FF;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow:    0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,.1),0 4px 12px rgba(0,0,0,.06);
+
+  --r:    8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-
 html { scroll-behavior: smooth; }
 
 body {
   margin: 0;
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  overflow-x: hidden;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
-/* ── SCROLLBAR ──────────────────────────────────────── */
-::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
 
-/* ── KEYFRAMES ──────────────────────────────────────── */
-@keyframes fadein    { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
-@keyframes slideIn   { from{opacity:0;transform:translateX(-12px)} to{opacity:1;transform:none} }
-@keyframes shimmer   { 0%{background-position:-400% 0} 100%{background-position:400% 0} }
-@keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
-@keyframes glow-in   { from{box-shadow:0 0 0 var(--blue-glow)} to{box-shadow:0 0 20px var(--blue-glow)} }
-@keyframes spin      { to{transform:rotate(360deg)} }
-@keyframes scanline  { 0%{transform:translateY(-100%)} 100%{transform:translateY(100vh)} }
-@keyframes float     { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
-@keyframes blink     { 0%,100%{opacity:1} 50%{opacity:0} }
+/* ── ANIMATIONS ── */
+@keyframes fadein  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+@keyframes slideIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:none} }
+@keyframes shimmer { 0%{background-position:-400% 0} 100%{background-position:400% 0} }
+@keyframes spin    { to{transform:rotate(360deg)} }
+@keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.75)} }
+@keyframes float   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+@keyframes fadeSlideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
 
-.fadein    { animation: fadein .3s cubic-bezier(.22,1,.36,1); }
-.slideIn   { animation: slideIn .25s cubic-bezier(.22,1,.36,1); }
-.stagger-1 { animation-delay: .05s; animation-fill-mode: both; }
-.stagger-2 { animation-delay: .1s;  animation-fill-mode: both; }
-.stagger-3 { animation-delay: .15s; animation-fill-mode: both; }
-.stagger-4 { animation-delay: .2s;  animation-fill-mode: both; }
+.fadein   { animation: fadein .25s cubic-bezier(.22,1,.36,1) both; }
+.slideIn  { animation: slideIn .2s cubic-bezier(.22,1,.36,1) both; }
+.stagger-1{ animation-delay:.04s; }
+.stagger-2{ animation-delay:.08s; }
+.stagger-3{ animation-delay:.12s; }
+.stagger-4{ animation-delay:.16s; }
 
-/* ── SKELETON ───────────────────────────────────────── */
+/* ── SKELETON ── */
 .skeleton {
-  background: linear-gradient(90deg, var(--bg3) 25%, rgba(255,255,255,0.035) 50%, var(--bg3) 75%);
+  background: linear-gradient(90deg,#f1f5f9 25%,#e2e8f0 50%,#f1f5f9 75%);
   background-size: 400% 100%;
-  animation: shimmer 1.8s ease infinite;
+  animation: shimmer 1.6s ease infinite;
   border-radius: 6px;
 }
 
-/* ── DRAG ───────────────────────────────────────────── */
-.drag-item { cursor: grab; transition: opacity .15s, transform .15s, background .15s; }
-.drag-item:hover { background: rgba(0,87,255,0.05) !important; }
-.drag-item.dragging { opacity:.35; transform:scale(.98); }
+/* ── DRAG ── */
+.drag-item { cursor: grab; transition: background .15s, transform .15s; }
+.drag-item:hover { background: var(--bg3) !important; }
+.drag-item.dragging { opacity:.4; transform:scale(.98); }
 
-/* ── STATUS BADGES ──────────────────────────────────── */
-.badge-online  { background:var(--green-soft); color:var(--green); border:1px solid rgba(0,217,126,.25); border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; letter-spacing:.02em; }
-.badge-offline { background:var(--red-soft);   color:var(--red);   border:1px solid rgba(255,59,92,.25);  border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; }
-.badge-warn    { background:var(--yellow-soft); color:var(--yellow);border:1px solid rgba(255,184,0,.25); border-radius:20px; padding:3px 10px; font-size:11px; font-weight:600; }
+/* ── STATUS BADGES ── */
+.badge-online  { background:var(--green-soft); color:#16A34A; border:1px solid #BBF7D0; border-radius:20px; padding:2px 10px; font-size:11px; font-weight:600; display:inline-flex; align-items:center; gap:5px; }
+.badge-offline { background:var(--red-soft);   color:#DC2626; border:1px solid #FECACA; border-radius:20px; padding:2px 10px; font-size:11px; font-weight:600; display:inline-flex; align-items:center; gap:5px; }
+.badge-warn    { background:var(--yellow-soft); color:#D97706; border:1px solid #FDE68A; border-radius:20px; padding:2px 10px; font-size:11px; font-weight:600; display:inline-flex; align-items:center; gap:5px; }
 
-/* ── DOTS ───────────────────────────────────────────── */
-.dot-online  { width:7px;height:7px;border-radius:50%;background:var(--green); box-shadow:0 0 0 2px rgba(0,217,126,.25); animation:pulse-dot 2.5s ease infinite; flex-shrink:0; }
-.dot-offline { width:7px;height:7px;border-radius:50%;background:var(--red);   flex-shrink:0; }
-.dot-warn    { width:7px;height:7px;border-radius:50%;background:var(--yellow);flex-shrink:0; }
+/* ── DOTS ── */
+.dot-online  { width:7px; height:7px; border-radius:50%; background:var(--green); flex-shrink:0; animation:pulse-dot 2.5s ease infinite; }
+.dot-offline { width:7px; height:7px; border-radius:50%; background:var(--red);   flex-shrink:0; }
+.dot-warn    { width:7px; height:7px; border-radius:50%; background:var(--yellow);flex-shrink:0; }
 
-/* ── CARDS ──────────────────────────────────────────── */
+/* ── CARDS ── */
 .sv-card {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  transition: border-color .2s, box-shadow .2s, transform .2s;
-  position: relative;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .2s, border-color .2s, transform .2s;
 }
-.sv-card:hover { border-color:var(--border2); box-shadow:0 8px 32px rgba(0,0,0,.35); transform:translateY(-1px); }
+.sv-card:hover { box-shadow:var(--shadow); border-color:var(--border2); transform:translateY(-1px); }
 
-/* ── STAT CARDS ─────────────────────────────────────── */
+/* ── STAT CARD ── */
 .stat-card {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
   padding: 20px 22px;
+  box-shadow: var(--shadow-sm);
+  transition: all .2s cubic-bezier(.22,1,.36,1);
+  cursor: pointer;
   position: relative;
   overflow: hidden;
-  cursor: pointer;
-  transition: all .2s cubic-bezier(.22,1,.36,1);
 }
-.stat-card::after {
-  content: '';
-  position: absolute; inset:0;
-  background: linear-gradient(135deg, rgba(255,255,255,.015) 0%, transparent 60%);
-  pointer-events: none;
-}
-.stat-card:hover { transform:translateY(-3px); box-shadow:0 12px 40px rgba(0,0,0,.4); border-color:var(--border2); }
+.stat-card:hover { box-shadow:var(--shadow); border-color:var(--blue); transform:translateY(-2px); }
 
-/* ── GLASS ──────────────────────────────────────────── */
-.glass {
-  background: rgba(255,255,255,0.025);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.07);
-  border-radius: var(--r-lg);
-}
-
-/* ── BUTTONS ────────────────────────────────────────── */
+/* ── BUTTONS ── */
 .btn-primary {
-  background: linear-gradient(135deg, var(--blue) 0%, var(--blue2) 100%);
+  background: var(--blue);
   color: #fff;
   border: none;
   border-radius: var(--r);
-  padding: 10px 20px;
+  padding: 9px 18px;
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: all .2s;
-  position: relative;
-  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+  transition: all .18s;
+  box-shadow: 0 1px 3px rgba(0,102,255,.3);
 }
-.btn-primary::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,.1) 0%, transparent 100%);
-  opacity: 0; transition: opacity .2s;
-}
-.btn-primary:hover::before { opacity: 1; }
-.btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 20px var(--blue-glow); }
+.btn-primary:hover { background:#0052CC; box-shadow:0 4px 12px rgba(0,102,255,.35); transform:translateY(-1px); }
 .btn-primary:active { transform:translateY(0); }
 
 .btn-sec {
-  background: rgba(255,255,255,0.05);
+  background: var(--bg2);
   color: var(--text2);
   border: 1px solid var(--border2);
   border-radius: var(--r);
-  padding: 10px 20px;
+  padding: 9px 18px;
   font-weight: 500;
   font-size: 13px;
   cursor: pointer;
-  font-family: 'DM Sans', sans-serif;
-  transition: all .2s;
+  font-family: 'Inter', sans-serif;
+  transition: all .18s;
 }
-.btn-sec:hover { background:rgba(255,255,255,.09); color:var(--text); border-color:var(--border3); }
+.btn-sec:hover { background:var(--bg3); color:var(--text); border-color:var(--border2); }
 
-/* ── INPUTS ─────────────────────────────────────────── */
+/* ── INPUTS ── */
 input, select, textarea {
-  background: var(--bg3) !important;
+  background: var(--bg2) !important;
   color: var(--text) !important;
   border: 1px solid var(--border2) !important;
   border-radius: var(--r) !important;
-  font-family: 'DM Sans', sans-serif !important;
+  font-family: 'Inter', sans-serif !important;
   font-size: 13px !important;
-  transition: border-color .2s, box-shadow .2s !important;
+  transition: border-color .18s, box-shadow .18s !important;
 }
 input:focus, select:focus, textarea:focus {
   outline: none !important;
   border-color: var(--blue) !important;
-  box-shadow: 0 0 0 3px rgba(0,87,255,.15) !important;
+  box-shadow: 0 0 0 3px rgba(0,102,255,.12) !important;
 }
 input::placeholder, textarea::placeholder { color: var(--text3) !important; }
-select option { background: var(--bg2); color: var(--text); }
+select option { background: #fff; color: var(--text); }
 
-/* ── TABLE ──────────────────────────────────────────── */
+/* ── TABLE ── */
 table { width:100%; border-collapse:collapse; }
-th { background:transparent; color:var(--text3); font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; padding:10px 16px; text-align:left; border-bottom:1px solid var(--border); }
-td { padding:13px 16px; border-bottom:1px solid var(--border); font-size:13px; color:var(--text); }
+th { background:var(--bg3); color:var(--text2); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; padding:9px 16px; text-align:left; border-bottom:1px solid var(--border); }
+td { padding:12px 16px; border-bottom:1px solid var(--border); font-size:13px; color:var(--text); }
 tr:last-child td { border-bottom:none; }
-tr:hover td { background:rgba(255,255,255,.018); }
+tr:hover td { background:var(--bg3); }
 
-/* ── MODAL ──────────────────────────────────────────── */
+/* ── MODAL ── */
 .sv-modal-backdrop {
   position:fixed;inset:0;z-index:1000;
-  background:rgba(0,0,0,.75);
-  backdrop-filter:blur(12px);
+  background:rgba(15,23,42,.5);
+  backdrop-filter:blur(6px);
   display:flex;align-items:center;justify-content:center;padding:16px;
   animation:fadein .18s ease;
 }
 .sv-modal {
   background:var(--bg2);
-  border:1px solid var(--border2);
+  border:1px solid var(--border);
   border-radius:var(--r-xl);
-  box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.04);
+  box-shadow:var(--shadow-lg);
   width:100%;max-width:560px;
   max-height:92vh;overflow:hidden;
   display:flex;flex-direction:column;
 }
 .sv-modal.wide { max-width:900px; }
 .sv-modal.xl   { max-width:1100px; }
-.sv-modal-header {
-  display:flex;align-items:center;justify-content:space-between;
-  padding:22px 26px 18px;
-  border-bottom:1px solid var(--border);
-}
-.sv-modal-title { font-family:'Syne',sans-serif;font-size:16px;font-weight:700;letter-spacing:-.01em; }
-.sv-modal-body  { padding:22px 26px;overflow-y:auto;flex:1; }
-.sv-modal-footer{ padding:16px 26px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end; }
+.sv-modal-header { display:flex;align-items:center;justify-content:space-between;padding:20px 24px 16px;border-bottom:1px solid var(--border); }
+.sv-modal-title  { font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700; }
+.sv-modal-body   { padding:20px 24px;overflow-y:auto;flex:1; }
+.sv-modal-footer { padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end; }
 
-/* ── SIDEBAR ACTIVE ─────────────────────────────────── */
+/* ── NAV ACTIVE ── */
 .nav-active-indicator {
   position:absolute;left:0;top:50%;transform:translateY(-50%);
-  width:3px;height:65%;
-  background:linear-gradient(180deg,var(--blue),var(--blue3));
+  width:3px;height:60%;
+  background:var(--blue);
   border-radius:0 3px 3px 0;
-  box-shadow:0 0 10px var(--blue);
 }
 
-/* ── HEADER ─────────────────────────────────────────── */
+/* ── TOP HEADER ── */
 #top-header {
-  position: sticky; top: 0; z-index: 100;
-  background: rgba(7,13,24,.9);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
-  padding: 0 24px;
-  height: 58px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  position:sticky;top:0;z-index:100;
+  background:rgba(255,255,255,.9);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;
+  height:54px;
+  display:flex;align-items:center;gap:16px;
 }
 
-/* ── PAGE WRAPPER ───────────────────────────────────── */
-.page-content { padding: 24px; max-width: 1400px; }
-.page-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -.02em;
-  color: var(--text);
-  margin: 0 0 2px 0;
-}
-.page-sub { font-size: 12.5px; color: var(--text3); margin: 0; }
+/* ── PAGE CONTENT ── */
+.page-content { padding:24px; max-width:1440px; }
+.page-title { font-family:'Plus Jakarta Sans',sans-serif; font-size:19px; font-weight:800; color:var(--text); margin:0 0 2px; letter-spacing:-.02em; }
+.page-sub   { font-size:12.5px; color:var(--text3); margin:0; }
 
-/* ── PANEL SECTION ──────────────────────────────────── */
-.panel {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  overflow: hidden;
-}
-.panel-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: space-between;
-}
-.panel-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 13px; font-weight: 700;
-  color: var(--text);
-  letter-spacing: .01em;
-}
+/* ── PANEL ── */
+.panel { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r-xl); overflow:hidden; box-shadow:var(--shadow-sm); }
+.panel-header { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.panel-title  { font-family:'Plus Jakarta Sans',sans-serif; font-size:13px; font-weight:700; color:var(--text); }
 
-/* ── GLOW LINES ─────────────────────────────────────── */
-.glow-border-top::before {
-  content:'';position:absolute;top:0;left:10%;right:10%;height:1px;
-  background:linear-gradient(90deg,transparent,var(--blue-glow),transparent);
-}
+/* ── GLASS ── */
+.glass { background:rgba(255,255,255,.7); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.9); border-radius:var(--r-lg); }
 
-/* ── MINI CHART BARS ────────────────────────────────── */
-.mini-bar {
-  display: inline-block;
-  width: 3px;
-  border-radius: 2px;
-  transition: height .3s ease;
+/* ── SIDEBAR NAV ── */
+.nav-item {
+  width:100%;display:flex;align-items:center;gap:9px;
+  padding:8px 10px 8px 12px;border-radius:8px;border:none;
+  cursor:pointer;font-size:13px;font-weight:500;
+  font-family:'Inter',sans-serif;position:relative;
+  background:transparent;color:var(--text2);
+  transition:all .15s;text-align:left;
+  margin-bottom:1px;
 }
+.nav-item:hover { background:var(--bg3); color:var(--text); }
+.nav-item.active { background:var(--blue-soft); color:var(--blue); font-weight:600; }
 
-/* ── TV CARD ────────────────────────────────────────── */
-.tv-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  overflow: hidden;
-  transition: all .22s cubic-bezier(.22,1,.36,1);
-  position: relative;
-}
-.tv-card:hover { border-color:var(--border2); transform:translateY(-2px); box-shadow:0 16px 48px rgba(0,0,0,.45); }
-.tv-card.online::before {
-  content:''; position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,var(--green),transparent);
-}
-.tv-card.offline::before {
-  content:''; position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,var(--red),transparent);
-}
-
-/* ── TOAST ──────────────────────────────────────────── */
-#sv-toast {
-  position:fixed;bottom:28px;right:28px;z-index:9999;
-  background:var(--bg3);border:1px solid var(--border2);
-  color:var(--text);padding:13px 18px;border-radius:var(--r-lg);
-  font-size:13px;font-weight:500;
-  box-shadow:0 12px 40px rgba(0,0,0,.5);
-  transform:translateY(80px);opacity:0;
-  transition:transform .35s cubic-bezier(.34,1.56,.64,1),opacity .3s;
-  pointer-events:none;
-  display:flex;align-items:center;gap:8px;
-}
-#sv-toast.show { transform:translateY(0);opacity:1; }
-
-/* ── MOBILE ─────────────────────────────────────────── */
+/* ── MOBILE ── */
 #sidebar { display:flex; }
 #mobile-nav { display:none; }
-#mobile-drawer { display:none;position:fixed;top:0;left:0;bottom:0;z-index:200;flex-direction:column;width:240px;box-shadow:4px 0 60px rgba(0,0,0,.7);transition:transform .28s cubic-bezier(.4,0,.2,1); }
+#mobile-drawer { display:none;position:fixed;top:0;left:0;bottom:0;z-index:200;flex-direction:column;width:240px;box-shadow:var(--shadow-lg);transition:transform .28s cubic-bezier(.4,0,.2,1); }
 #mobile-drawer.closed { transform:translateX(-100%); }
-#mobile-overlay { display:none;position:fixed;inset:0;z-index:199;background:rgba(0,0,0,.65);backdrop-filter:blur(6px); }
-#mobile-menu-btn { display:none;position:fixed;top:12px;left:12px;z-index:201;width:38px;height:38px;border-radius:10px;border:none;cursor:pointer;align-items:center;justify-content:center;font-size:16px;background:var(--bg2);border:1px solid var(--border2);color:var(--text);box-shadow:0 4px 16px rgba(0,0,0,.4); }
+#mobile-overlay { display:none;position:fixed;inset:0;z-index:199;background:rgba(15,23,42,.4);backdrop-filter:blur(4px); }
+#mobile-menu-btn { display:none;position:fixed;top:12px;left:12px;z-index:201;width:36px;height:36px;border-radius:8px;border:none;cursor:pointer;align-items:center;justify-content:center;font-size:15px;background:var(--bg2);border:1px solid var(--border);color:var(--text);box-shadow:var(--shadow); }
 @media(max-width:768px){
   #sidebar{display:none!important}
   #mobile-menu-btn{display:flex!important}
   .page-content{padding:16px!important}
 }
 
-/* ── TAILWIND DARK OVERRIDES ────────────────────────── */
-.bg-white          { background:var(--bg2)!important }
-.bg-gray-50        { background:var(--bg)!important }
-.bg-gray-100       { background:var(--bg3)!important }
-.bg-blue-600       { background:var(--blue)!important }
-.bg-blue-50        { background:var(--blue-soft)!important }
-.bg-red-50         { background:var(--red-soft)!important }
-.bg-green-50       { background:var(--green-soft)!important }
-.bg-yellow-50      { background:var(--yellow-soft)!important }
-.bg-purple-50      { background:var(--purple-soft)!important }
+/* ── TAILWIND OVERRIDES FOR LIGHT ── */
+.bg-white     { background:var(--bg2)!important }
+.bg-gray-50   { background:var(--bg)!important }
+.bg-gray-100  { background:var(--bg3)!important }
+.bg-blue-600  { background:var(--blue)!important }
+.bg-blue-50   { background:var(--blue-soft)!important }
+.bg-red-50    { background:var(--red-soft)!important }
+.bg-green-50  { background:var(--green-soft)!important }
+.bg-yellow-50 { background:var(--yellow-soft)!important }
+.bg-purple-50 { background:var(--purple-soft)!important }
 .text-gray-900,.text-gray-800 { color:var(--text)!important }
 .text-gray-700,.text-gray-600 { color:var(--text2)!important }
 .text-gray-500,.text-gray-400 { color:var(--text3)!important }
-.text-blue-600,.text-blue-700 { color:var(--blue2)!important }
-.text-blue-800     { color:var(--blue3)!important }
-.text-red-600      { color:var(--red)!important }
-.text-red-400      { color:var(--red)!important }
-.text-green-600    { color:var(--green)!important }
-.text-yellow-600   { color:var(--yellow)!important }
-.text-purple-800   { color:#a78bfa!important }
-.text-purple-500   { color:#8b5cf6!important }
+.text-blue-600,.text-blue-700 { color:var(--blue)!important }
+.text-blue-800 { color:#1D4ED8!important }
+.text-red-600  { color:#DC2626!important }
+.text-red-400  { color:#F87171!important }
+.text-green-600{ color:#16A34A!important }
+.text-yellow-600{color:#D97706!important }
+.text-purple-800{color:#6D28D9!important }
+.text-purple-500{color:#8B5CF6!important }
 .border-gray-100,.border-gray-200 { border-color:var(--border)!important }
-.border-gray-300   { border-color:var(--border2)!important }
+.border-gray-300{ border-color:var(--border2)!important }
 .divide-gray-100>*+* { border-color:var(--border)!important }
-.shadow-sm         { box-shadow:0 2px 12px rgba(0,0,0,.3)!important }
+.shadow-sm  { box-shadow:var(--shadow-sm)!important }
 .rounded-xl,.rounded-lg { border-radius:var(--r)!important }
-.rounded-2xl       { border-radius:var(--r-lg)!important }
-.hover\:bg-gray-50:hover  { background:rgba(255,255,255,.03)!important }
-.hover\:bg-blue-50:hover  { background:var(--blue-soft)!important }
+.rounded-2xl { border-radius:var(--r-lg)!important }
+.hover\:bg-gray-50:hover { background:var(--bg3)!important }
+.hover\:bg-blue-50:hover { background:var(--blue-soft)!important }
 </style>
 </head>
 <body style="background:var(--bg)">
@@ -473,9 +384,9 @@ function Modal({title,onClose,onSave,children,wide,xl,saveLabel='Salvar',saveDan
       <div className={`sv-modal fadein${wide||xl?' wide':''}`} style={xl?{maxWidth:1100}:{}}>
         <div className="sv-modal-header">
           <div className="sv-modal-title">{title}</div>
-          <button onClick={onClose} style={{background:'rgba(255,255,255,0.06)',border:'1px solid var(--border)',color:'var(--text2)',width:30,height:30,borderRadius:8,cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',transition:'all .2s'}}
-            onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,77,79,0.15)';e.currentTarget.style.color='var(--red)';}}
-            onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.06)';e.currentTarget.style.color='var(--text2)';}}>
+          <button onClick={onClose} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',color:'#64748B',width:30,height:30,borderRadius:8,cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',transition:'all .2s'}}
+            onMouseEnter={e=>{e.currentTarget.style.background='#FEF2F2';e.currentTarget.style.color='#DC2626';}}
+            onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#64748B';}}>
             ✕
           </button>
         </div>
@@ -495,7 +406,7 @@ function Modal({title,onClose,onSave,children,wide,xl,saveLabel='Salvar',saveDan
 }
 
 
-function Lbl({children}){return <label style={{display:'block',fontSize:11,fontWeight:700,color:'var(--text3)',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:7}}>{children}</label>;}
+function Lbl({children}){return <label style={{display:'block',fontSize:12,fontWeight:600,color:'#475569',marginBottom:6}}>{children}</label>;}
 function Inp({value,onChange,placeholder,type='text',disabled=false}){
   return <input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} disabled={disabled} style={{width:'100%',padding:'10px 14px',display:'block',opacity:disabled?.5:1}}/>;
 }
@@ -504,98 +415,162 @@ function Sel({value,onChange,children,className=''}){
 }
 function StatCard({icon,label,value,sub,color='blue',onClick,trend}){
   const C={
-    blue:  {bg:'rgba(0,87,255,.1)',  border:'rgba(0,87,255,.22)',  text:'#4d9fff', glow:'rgba(0,87,255,.4)',  grad:'135deg,#0057FF,#0099FF'},
-    green: {bg:'rgba(0,217,126,.1)', border:'rgba(0,217,126,.22)', text:'#00D97E', glow:'rgba(0,217,126,.4)', grad:'135deg,#00D97E,#00ffaa'},
-    red:   {bg:'rgba(255,59,92,.1)', border:'rgba(255,59,92,.22)', text:'#FF3B5C', glow:'rgba(255,59,92,.4)',  grad:'135deg,#FF3B5C,#ff6b88'},
-    yellow:{bg:'rgba(255,184,0,.1)', border:'rgba(255,184,0,.22)', text:'#FFB800', glow:'rgba(255,184,0,.4)', grad:'135deg,#FFB800,#ffcc44'},
-    purple:{bg:'rgba(139,92,246,.1)',border:'rgba(139,92,246,.22)',text:'#a78bfa', glow:'rgba(139,92,246,.4)',grad:'135deg,#8B5CF6,#a78bfa'},
+    blue:  {bg:'#EFF6FF',icon:'#2563EB',text:'#1D4ED8',border:'#BFDBFE',accent:'#3B82F6'},
+    green: {bg:'#F0FDF4',icon:'#16A34A',text:'#15803D',border:'#BBF7D0',accent:'#22C55E'},
+    red:   {bg:'#FEF2F2',icon:'#DC2626',text:'#B91C1C',border:'#FECACA',accent:'#EF4444'},
+    yellow:{bg:'#FFFBEB',icon:'#D97706',text:'#B45309',border:'#FDE68A',accent:'#F59E0B'},
+    purple:{bg:'#F5F3FF',icon:'#7C3AED',text:'#6D28D9',border:'#DDD6FE',accent:'#8B5CF6'},
   };
   const c=C[color]||C.blue;
   return (
-    <div onClick={onClick} className="stat-card fadein" style={{cursor:onClick?'pointer':'default',borderColor:c.border}}>
-      {/* Gradient line top */}
-      <div style={{position:'absolute',top:0,left:0,right:0,height:1,background:`linear-gradient(90deg,transparent,${c.text},transparent)`,opacity:.5}}/>
-      {/* Icon + indicator */}
+    <div onClick={onClick} className="stat-card fadein" style={{cursor:onClick?'pointer':'default'}}>
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14}}>
-        <div style={{width:42,height:42,borderRadius:12,background:c.bg,border:`1px solid ${c.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,boxShadow:`0 4px 14px ${c.glow}`}}>
+        <div style={{width:44,height:44,borderRadius:12,background:c.bg,border:`1px solid ${c.border}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:20}}>
           {icon}
         </div>
         {trend!==undefined&&(
-          <span style={{fontSize:11,fontWeight:600,color:trend>=0?'var(--green)':'var(--red)',background:trend>=0?'var(--green-soft)':'var(--red-soft)',border:`1px solid ${trend>=0?'rgba(0,217,126,.25)':'rgba(255,59,92,.25)'}`,borderRadius:20,padding:'2px 8px'}}>
-            {trend>=0?'↑':'↓'} {Math.abs(trend)}%
+          <span style={{fontSize:11,fontWeight:600,color:trend>=0?'#16A34A':'#DC2626',background:trend>=0?'#F0FDF4':'#FEF2F2',border:`1px solid ${trend>=0?'#BBF7D0':'#FECACA'}`,borderRadius:20,padding:'2px 8px',display:'flex',alignItems:'center',gap:3}}>
+            {trend>=0?'↑':'↓'}{Math.abs(trend)}%
           </span>
         )}
       </div>
-      {/* Value */}
-      <div style={{fontFamily:"'Syne',sans-serif",fontSize:28,fontWeight:800,color:'var(--text)',lineHeight:1,marginBottom:5,letterSpacing:'-.02em',background:`linear-gradient(${c.grad})`,WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>
+      <div style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:28,fontWeight:800,color:c.text,lineHeight:1,marginBottom:4,letterSpacing:'-.02em'}}>
         {value}
       </div>
-      <div style={{fontSize:12.5,color:'var(--text2)',fontWeight:500,letterSpacing:'.01em'}}>{label}</div>
-      {sub&&<div style={{fontSize:11,color:c.text,marginTop:5,fontWeight:600,display:'flex',alignItems:'center',gap:4}}><span style={{width:4,height:4,borderRadius:2,background:c.text,display:'inline-block'}}/>{sub}</div>}
+      <div style={{fontSize:12.5,color:'#64748B',fontWeight:500}}>{label}</div>
+      {sub&&<div style={{fontSize:11.5,color:c.icon,marginTop:6,fontWeight:600,display:'flex',alignItems:'center',gap:4}}>
+        <span style={{width:5,height:5,borderRadius:'50%',background:c.accent,display:'inline-block'}}/>
+        {sub}
+      </div>}
     </div>
   );
 }
 
-
 function LoginPage({onLogin}) {
-  const [u,setU]=useState('admin');const [p,setP]=useState('');const [err,setErr]=useState('');const [loading,setLoading]=useState(false);
-  const submit=async(e)=>{if(e?.key&&e.key!=='Enter')return;setLoading(true);setErr('');const r=await api.login(u,p);if(r.token){TOKEN=r.token;localStorage.setItem('smartvision_token',r.token);onLogin(r.username);}else setErr(r.error||'Credenciais inválidas');setLoading(false);};
+  const [u,setU]=useState('admin');
+  const [p,setP]=useState('');
+  const [err,setErr]=useState('');
+  const [loading,setLoading]=useState(false);
+  const submit=async(e)=>{
+    if(e?.key&&e.key!=='Enter')return;
+    setLoading(true);setErr('');
+    const r=await api.login(u,p);
+    if(r.token){TOKEN=r.token;localStorage.setItem('smartvision_token',r.token);onLogin(r.username);}
+    else setErr(r.error||'Credenciais inválidas');
+    setLoading(false);
+  };
   return (
-    <div style={{minHeight:'100vh',background:'var(--bg)',display:'flex',alignItems:'center',justifyContent:'center',padding:16,position:'relative',overflow:'hidden'}}>
-      {/* Ambient glow */}
-      <div style={{position:'absolute',top:'20%',left:'50%',transform:'translateX(-50%)',width:600,height:600,background:'radial-gradient(circle,rgba(0,87,255,.12) 0%,transparent 65%)',pointerEvents:'none'}}/>
-      <div style={{position:'absolute',bottom:'-10%',right:'-5%',width:400,height:400,background:'radial-gradient(circle,rgba(0,199,255,.07) 0%,transparent 65%)',pointerEvents:'none'}}/>
+    <div style={{minHeight:'100vh',display:'flex',position:'relative',overflow:'hidden',fontFamily:"'Inter',sans-serif"}}>
 
-      {/* Subtle grid */}
-      <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px)',backgroundSize:'48px 48px',pointerEvents:'none'}}/>
+      {/* ── LEFT PANEL — visual decorativo ── */}
+      <div style={{flex:'0 0 55%',position:'relative',background:'linear-gradient(135deg,#0F172A 0%,#1E3A8A 50%,#0C4A6E 100%)',overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
 
-      <div className="fadein" style={{width:'100%',maxWidth:420,position:'relative',zIndex:1}}>
-        {/* Logo */}
-        <div style={{textAlign:'center',marginBottom:40}}>
-          <img src="/logo.png" alt="SmartVision Pro" style={{height:90,objectFit:'contain',marginBottom:12,filter:'drop-shadow(0 0 20px rgba(0,87,255,.35))'}}/>
-          <div style={{fontSize:11,color:'var(--text3)',letterSpacing:'.18em',textTransform:'uppercase',fontWeight:600}}>Sistema Indoor de TV Corporativa</div>
+        {/* Grid pattern */}
+        <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px)',backgroundSize:'60px 60px'}}/>
+
+        {/* Floating screen decorations */}
+        {[
+          {top:'8%',left:'6%',w:180,h:110,delay:0,rot:-5},
+          {top:'12%',left:'48%',w:140,h:88,delay:.4,rot:3},
+          {top:'38%',left:'2%',w:160,h:100,delay:.2,rot:2},
+          {top:'42%',left:'52%',w:190,h:118,delay:.6,rot:-3},
+          {top:'68%',left:'10%',w:150,h:95,delay:.3,rot:4},
+          {top:'72%',left:'50%',w:170,h:106,delay:.8,rot:-2},
+        ].map((s,i)=>(
+          <div key={i} style={{position:'absolute',top:s.top,left:s.left,width:s.w,height:s.h,borderRadius:8,border:'1px solid rgba(255,255,255,.15)',background:'rgba(255,255,255,.04)',transform:`rotate(${s.rot}deg)`,animation:`float ${3+i*.4}s ease-in-out infinite`,animationDelay:`${s.delay}s`,backdropFilter:'blur(2px)',overflow:'hidden'}}>
+            {/* Screen content mockup */}
+            <div style={{position:'absolute',inset:0,background:'linear-gradient(135deg,rgba(0,102,255,.2),rgba(0,163,255,.1))'}}/>
+            <div style={{position:'absolute',top:8,left:10,right:10}}>
+              <div style={{height:4,background:'rgba(255,255,255,.2)',borderRadius:2,marginBottom:5,width:'70%'}}/>
+              <div style={{height:3,background:'rgba(255,255,255,.12)',borderRadius:2,marginBottom:4,width:'90%'}}/>
+              <div style={{height:3,background:'rgba(255,255,255,.12)',borderRadius:2,width:'55%'}}/>
+            </div>
+            <div style={{position:'absolute',bottom:8,left:10,right:10,height:30,background:'linear-gradient(90deg,rgba(0,102,255,.3),rgba(0,163,255,.2))',borderRadius:4,display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <div style={{width:10,height:10,borderRadius:'50%',border:'2px solid rgba(255,255,255,.4)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <div style={{width:0,height:0,borderTop:'3px solid transparent',borderBottom:'3px solid transparent',borderLeft:'5px solid rgba(255,255,255,.5)',marginLeft:1}}/>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {/* Center logo watermark */}
+        <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',opacity:.06,pointerEvents:'none'}}>
+          <img src="/logo.png" alt="" style={{width:500,objectFit:'contain',filter:'brightness(10)'}}/>
         </div>
 
-        {/* Card */}
-        <div style={{background:'rgba(10,18,32,.85)',border:'1px solid var(--border2)',borderRadius:20,padding:32,backdropFilter:'blur(20px)',boxShadow:'0 32px 80px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04)'}}>
-          <div style={{marginBottom:24}}>
-            <div style={{fontSize:18,fontFamily:"'Syne',sans-serif",fontWeight:700,letterSpacing:'-.02em',marginBottom:4}}>Bem-vindo de volta</div>
-            <div style={{fontSize:13,color:'var(--text3)'}}>Entre com suas credenciais para continuar</div>
-          </div>
-
-          {err&&<div className="fadein" style={{background:'var(--red-soft)',border:'1px solid rgba(255,59,92,.25)',color:'var(--red)',borderRadius:10,padding:'11px 14px',marginBottom:16,fontSize:13,display:'flex',alignItems:'center',gap:8}}>
-            <span>⚠</span><span>{err}</span>
-          </div>}
-
-          <div style={{marginBottom:16}}>
-            <label style={{fontSize:11,fontWeight:700,color:'var(--text3)',letterSpacing:'.06em',textTransform:'uppercase',display:'block',marginBottom:7}}>Usuário</label>
-            <input value={u} onChange={e=>setU(e.target.value)} onKeyDown={submit} placeholder="admin" style={{width:'100%',padding:'11px 14px',display:'block'}}/>
-          </div>
-          <div style={{marginBottom:24}}>
-            <label style={{fontSize:11,fontWeight:700,color:'var(--text3)',letterSpacing:'.06em',textTransform:'uppercase',display:'block',marginBottom:7}}>Senha</label>
-            <input value={p} onChange={e=>setP(e.target.value)} onKeyDown={submit} type="password" placeholder="••••••••" style={{width:'100%',padding:'11px 14px',display:'block'}}/>
-          </div>
-
-          <button onClick={()=>submit()} disabled={loading} className="btn-primary" style={{width:'100%',padding:'13px',fontSize:14,borderRadius:12,letterSpacing:'.01em'}}>
-            {loading
-              ? <span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><span style={{width:14,height:14,border:'2px solid rgba(255,255,255,.3)',borderTopColor:'#fff',borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/> Entrando...</span>
-              : '→ Acessar Painel'}
-          </button>
+        {/* Bottom text */}
+        <div style={{position:'absolute',bottom:32,left:0,right:0,textAlign:'center'}}>
+          <div style={{color:'rgba(255,255,255,.6)',fontSize:12,letterSpacing:'.12em',textTransform:'uppercase',fontWeight:500}}>Sistema Indoor de TV Corporativa</div>
+          <div style={{color:'rgba(255,255,255,.3)',fontSize:11,marginTop:4}}>Monitore · Controle · Publique</div>
         </div>
 
-        {/* Footer */}
-        <div style={{textAlign:'center',marginTop:24,fontSize:11,color:'var(--text3)'}}>
-          <div style={{marginBottom:4}}>© Eduardo Soluções Tecnológicas</div>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12}}>
-            <span>📞 (91) 98819-6385</span>
-            <span style={{opacity:.4}}>·</span>
-            <span>📸 @eduardosolucoestec</span>
+        {/* Connection lines decoration */}
+        <svg style={{position:'absolute',inset:0,width:'100%',height:'100%',opacity:.08}} viewBox="0 0 600 700">
+          <line x1="100" y1="100" x2="300" y2="300" stroke="white" strokeWidth="1"/>
+          <line x1="500" y1="150" x2="300" y2="300" stroke="white" strokeWidth="1"/>
+          <line x1="150" y1="500" x2="300" y2="300" stroke="white" strokeWidth="1"/>
+          <line x1="450" y1="550" x2="300" y2="300" stroke="white" strokeWidth="1"/>
+          <circle cx="100" cy="100" r="4" fill="white"/>
+          <circle cx="500" cy="150" r="4" fill="white"/>
+          <circle cx="150" cy="500" r="4" fill="white"/>
+          <circle cx="450" cy="550" r="4" fill="white"/>
+          <circle cx="300" cy="300" r="6" fill="white"/>
+        </svg>
+      </div>
+
+      {/* ── RIGHT PANEL — login form ── */}
+      <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',padding:'40px 32px',background:'#F8FAFC',position:'relative'}}>
+
+        {/* Subtle pattern */}
+        <div style={{position:'absolute',inset:0,backgroundImage:'radial-gradient(circle at 1px 1px,#E2E8F0 1px,transparent 0)',backgroundSize:'32px 32px',opacity:.5}}/>
+
+        <div className="fadein" style={{width:'100%',maxWidth:380,position:'relative',zIndex:1}}>
+
+          {/* Logo */}
+          <div style={{textAlign:'center',marginBottom:36}}>
+            <img src="/logo.png" alt="SmartVision Pro" style={{height:80,objectFit:'contain',marginBottom:10,filter:'drop-shadow(0 4px 12px rgba(0,102,255,.2))'}}/>
+          </div>
+
+          {/* Form card */}
+          <div style={{background:'#fff',borderRadius:16,padding:'32px 28px',boxShadow:'0 4px 24px rgba(0,0,0,.08),0 1px 4px rgba(0,0,0,.04)',border:'1px solid #E2E8F0'}}>
+            <div style={{marginBottom:22}}>
+              <div style={{fontSize:17,fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:800,color:'#1E293B',marginBottom:4}}>Entrar na plataforma</div>
+              <div style={{fontSize:12.5,color:'#94A3B8'}}>Acesse seu painel de gerenciamento</div>
+            </div>
+
+            {err&&<div className="fadein" style={{background:'#FEF2F2',border:'1px solid #FECACA',color:'#DC2626',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:13,display:'flex',alignItems:'center',gap:8}}>
+              <span>⚠</span><span>{err}</span>
+            </div>}
+
+            <div style={{marginBottom:14}}>
+              <label style={{display:'block',fontSize:11.5,fontWeight:600,color:'#475569',marginBottom:6}}>Usuário</label>
+              <input value={u} onChange={e=>setU(e.target.value)} onKeyDown={submit} placeholder="admin" style={{width:'100%',padding:'10px 14px',display:'block'}}/>
+            </div>
+            <div style={{marginBottom:22}}>
+              <label style={{display:'block',fontSize:11.5,fontWeight:600,color:'#475569',marginBottom:6}}>Senha</label>
+              <input value={p} onChange={e=>setP(e.target.value)} onKeyDown={submit} type="password" placeholder="••••••••" style={{width:'100%',padding:'10px 14px',display:'block'}}/>
+            </div>
+
+            <button onClick={()=>submit()} disabled={loading} className="btn-primary" style={{width:'100%',padding:'11px',fontSize:14,borderRadius:10,fontWeight:700}}>
+              {loading
+                ? <span style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8}}><span style={{width:14,height:14,border:'2px solid rgba(255,255,255,.4)',borderTopColor:'#fff',borderRadius:'50%',display:'inline-block',animation:'spin .7s linear infinite'}}/> Entrando...</span>
+                : 'Acessar →'}
+            </button>
+          </div>
+
+          {/* Footer */}
+          <div style={{textAlign:'center',marginTop:20,fontSize:11,color:'#94A3B8'}}>
+            <div>© Eduardo Soluções Tecnológicas</div>
+            <div style={{marginTop:3,display:'flex',alignItems:'center',justifyContent:'center',gap:10}}>
+              <span>📞 (91) 98819-6385</span><span>·</span><span>📸 @eduardosolucoestec</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 // ── SIDEBAR ──────────────────────────────────────────────────────
 const NAV=[
@@ -615,61 +590,58 @@ const NAV=[
 function Sidebar({page,setPage,logout,username,reloadTVs,reloading,tvs=[]}){
   const online=(tvs||[]).filter(t=>t.status==='online').length;
   const total=(tvs||[]).length;
-  const NAV_GROUPS=[
-    {label:'PRINCIPAL',items:[
-      {id:'dashboard',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>,label:'Dashboard'},
-      {id:'tvs',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>,label:'TVs',badge:total>0?`${online}/${total}`:null,badgeColor:online===total&&total>0?'var(--green)':'var(--yellow)'},
+
+  const GROUPS=[
+    {label:'Principal',items:[
+      {id:'dashboard',icon:'⊞',label:'Dashboard'},
+      {id:'tvs',icon:'▣',label:'TVs',badge:total>0?`${online}/${total}`:null,badgeOk:online===total&&total>0},
     ]},
-    {label:'CONTEÚDO',items:[
-      {id:'videos',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>,label:'Mídias'},
-      {id:'playlists',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,label:'Playlists'},
-      {id:'schedules',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,label:'Agendamentos'},
+    {label:'Conteúdo',items:[
+      {id:'videos',icon:'▶',label:'Mídias'},
+      {id:'playlists',icon:'☰',label:'Playlists'},
+      {id:'schedules',icon:'◷',label:'Agendamentos'},
     ]},
-    {label:'RECURSOS',items:[
-      {id:'widgets',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>,label:'Widgets'},
-      {id:'sponsors',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,label:'Patrocinadores'},
-      {id:'emergency',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,label:'Emergência'},
+    {label:'Recursos',items:[
+      {id:'widgets',icon:'⊹',label:'Widgets'},
+      {id:'sponsors',icon:'◈',label:'Patrocinadores'},
+      {id:'emergency',icon:'⚡',label:'Emergência'},
     ]},
-    {label:'SISTEMA',items:[
-      {id:'reports',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,label:'Relatórios'},
-      {id:'users',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,label:'Usuários'},
-      {id:'settings',icon:<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,label:'Aparência'},
+    {label:'Sistema',items:[
+      {id:'reports',icon:'↗',label:'Relatórios'},
+      {id:'users',icon:'◎',label:'Usuários'},
+      {id:'settings',icon:'⚙',label:'Aparência'},
     ]},
   ];
 
   return (
-    <div id="sidebar" style={{width:220,display:'flex',flexDirection:'column',flexShrink:0,background:'var(--sidebar)',borderRight:'1px solid var(--border)',height:'100vh',position:'sticky',top:0,overflow:'hidden',zIndex:50}}>
+    <div id="sidebar" style={{width:216,display:'flex',flexDirection:'column',flexShrink:0,background:'#fff',borderRight:'1px solid #E2E8F0',height:'100vh',position:'sticky',top:0,overflow:'hidden',boxShadow:'1px 0 0 #E2E8F0'}}>
 
       {/* Logo */}
-      <div style={{padding:'18px 16px 14px',borderBottom:'1px solid var(--border)',position:'relative'}}>
-        <div style={{position:'absolute',inset:0,background:'radial-gradient(ellipse at 50% 0%,rgba(0,87,255,.08),transparent 70%)',pointerEvents:'none'}}/>
-        <img src="/logo.png" alt="SmartVision Pro" style={{height:34,objectFit:'contain',maxWidth:160,filter:'drop-shadow(0 0 8px rgba(0,87,255,.3))'}}/>
-        <div style={{marginTop:10,display:'flex',alignItems:'center',gap:6}}>
+      <div style={{padding:'16px 16px 12px',borderBottom:'1px solid #E2E8F0'}}>
+        <img src="/logo.png" alt="SmartVision Pro" style={{height:32,objectFit:'contain',maxWidth:150}}/>
+        <div style={{marginTop:8,display:'flex',alignItems:'center',gap:5}}>
           <div className="dot-online" style={{width:6,height:6}}/>
-          <span style={{fontSize:10.5,color:'var(--text3)',letterSpacing:'.04em',fontWeight:500}}>Sistema Online</span>
-          {total>0&&<span style={{marginLeft:'auto',fontSize:10,fontWeight:700,color:online===total?'var(--green)':'var(--yellow)',background:online===total?'var(--green-soft)':'var(--yellow-soft)',border:`1px solid ${online===total?'rgba(0,217,126,.2)':'rgba(255,184,0,.2)'}`,borderRadius:10,padding:'1px 7px'}}>{online}/{total}</span>}
+          <span style={{fontSize:11,color:'#94A3B8',fontWeight:500}}>Sistema Online</span>
+          {total>0&&<span style={{marginLeft:'auto',fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:10,background:online===total?'#F0FDF4':'#FFFBEB',color:online===total?'#16A34A':'#D97706',border:`1px solid ${online===total?'#BBF7D0':'#FDE68A'}`}}>{online}/{total}</span>}
         </div>
       </div>
 
       {/* Nav */}
       <nav style={{flex:1,overflowY:'auto',padding:'6px 8px'}}>
-        {NAV_GROUPS.map(g=>(
-          <div key={g.label} style={{marginBottom:2}}>
-            <div style={{fontSize:9,fontWeight:800,color:'var(--text4)',letterSpacing:'.12em',padding:'10px 10px 5px',fontFamily:"'Syne',sans-serif",textTransform:'uppercase'}}>
+        {GROUPS.map(g=>(
+          <div key={g.label} style={{marginBottom:4}}>
+            <div style={{fontSize:10,fontWeight:700,color:'#CBD5E1',letterSpacing:'.08em',padding:'8px 8px 4px',textTransform:'uppercase',fontFamily:"'Plus Jakarta Sans',sans-serif"}}>
               {g.label}
             </div>
             {g.items.map(i=>{
               const isActive=page===i.id;
               return(
                 <button key={i.id} onClick={()=>setPage(i.id)}
-                  style={{width:'100%',display:'flex',alignItems:'center',gap:9,padding:'8px 10px 8px 14px',borderRadius:9,border:'none',cursor:'pointer',fontSize:12.5,fontWeight:isActive?600:400,fontFamily:"'DM Sans',sans-serif",position:'relative',background:isActive?'rgba(0,87,255,.14)':'transparent',color:isActive?'#fff':'var(--text2)',transition:'all .15s',marginBottom:1,}}
-                  onMouseEnter={e=>{if(!isActive){e.currentTarget.style.background='rgba(255,255,255,.045)';e.currentTarget.style.color='var(--text)';}}}
-                  onMouseLeave={e=>{if(!isActive){e.currentTarget.style.background='transparent';e.currentTarget.style.color='var(--text2)';}}}
-                >
+                  className={`nav-item${isActive?' active':''}`}>
                   {isActive&&<div className="nav-active-indicator"/>}
-                  <span style={{color:isActive?'var(--blue2)':'var(--text3)',transition:'color .15s',flexShrink:0,display:'flex'}}>{i.icon}</span>
+                  <span style={{fontSize:13,opacity:isActive?1:.6,transition:'opacity .15s'}}>{i.icon}</span>
                   <span style={{flex:1}}>{i.label}</span>
-                  {i.badge&&<span style={{fontSize:9.5,fontWeight:700,color:i.badgeColor,background:`${i.badgeColor}1a`,border:`1px solid ${i.badgeColor}33`,borderRadius:10,padding:'1px 6px',letterSpacing:'.02em'}}>{i.badge}</span>}
+                  {i.badge&&<span style={{fontSize:10,fontWeight:700,padding:'1px 7px',borderRadius:10,background:i.badgeOk?'#F0FDF4':'#FFFBEB',color:i.badgeOk?'#16A34A':'#D97706',border:`1px solid ${i.badgeOk?'#BBF7D0':'#FDE68A'}`}}>{i.badge}</span>}
                 </button>
               );
             })}
@@ -678,27 +650,27 @@ function Sidebar({page,setPage,logout,username,reloadTVs,reloading,tvs=[]}){
       </nav>
 
       {/* Footer */}
-      <div style={{padding:'8px',borderTop:'1px solid var(--border)'}}>
+      <div style={{padding:'8px',borderTop:'1px solid #E2E8F0'}}>
         <button onClick={()=>reloadTVs(null)} disabled={!!reloading}
-          style={{width:'100%',display:'flex',alignItems:'center',gap:7,justifyContent:'center',padding:'8px 12px',borderRadius:9,border:'1px solid var(--border)',cursor:'pointer',background:'rgba(255,255,255,.03)',color:'var(--text3)',fontSize:11.5,fontWeight:600,marginBottom:6,transition:'all .2s',fontFamily:"'DM Sans',sans-serif",letterSpacing:'.01em'}}
-          onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--blue)';e.currentTarget.style.color='var(--blue2)';e.currentTarget.style.background='var(--blue-soft)';}}
-          onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.color='var(--text3)';e.currentTarget.style.background='rgba(255,255,255,.03)';}}>
-          <span style={{display:'inline-block',animation:reloading?'spin .8s linear infinite':undefined,fontSize:12}}>↺</span>
+          style={{width:'100%',display:'flex',alignItems:'center',gap:7,justifyContent:'center',padding:'8px',borderRadius:8,border:'1px solid #E2E8F0',cursor:'pointer',background:'transparent',color:'#64748B',fontSize:12,fontWeight:600,marginBottom:6,transition:'all .18s',fontFamily:"'Inter',sans-serif"}}
+          onMouseEnter={e=>{e.currentTarget.style.background='#EFF6FF';e.currentTarget.style.color='#0066FF';e.currentTarget.style.borderColor='#BFDBFE';}}
+          onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#64748B';e.currentTarget.style.borderColor='#E2E8F0';}}>
+          <span style={{display:'inline-block',animation:reloading?'spin .8s linear infinite':undefined}}>↺</span>
           {reloading?'Recarregando...':'Recarregar TVs'}
         </button>
-        <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:9,background:'rgba(255,255,255,.025)'}}>
-          <div style={{width:26,height:26,borderRadius:7,background:'linear-gradient(135deg,var(--blue),var(--blue3))',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,flexShrink:0,boxShadow:'0 2px 8px var(--blue-glow)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:8,background:'#F8FAFC',border:'1px solid #E2E8F0'}}>
+          <div style={{width:28,height:28,borderRadius:8,background:'linear-gradient(135deg,#0066FF,#0099FF)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,flexShrink:0,color:'#fff'}}>
             {username?.[0]?.toUpperCase()||'A'}
           </div>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:12,fontWeight:600,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{username||'Admin'}</div>
-            <div style={{fontSize:10,color:'var(--text3)'}}>Administrador</div>
+            <div style={{fontSize:12.5,fontWeight:700,color:'#1E293B',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{username||'Admin'}</div>
+            <div style={{fontSize:10.5,color:'#94A3B8'}}>Administrador</div>
           </div>
           <button onClick={logout} title="Sair"
-            style={{background:'none',border:'none',cursor:'pointer',color:'var(--text3)',fontSize:13,padding:4,borderRadius:6,transition:'color .2s',display:'flex'}}
-            onMouseEnter={e=>e.currentTarget.style.color='var(--red)'}
-            onMouseLeave={e=>e.currentTarget.style.color='var(--text3)'}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            style={{background:'none',border:'none',cursor:'pointer',color:'#CBD5E1',fontSize:14,padding:4,borderRadius:6,transition:'color .18s',lineHeight:1}}
+            onMouseEnter={e=>e.currentTarget.style.color='#EF4444'}
+            onMouseLeave={e=>e.currentTarget.style.color='#CBD5E1'}>
+            ⏻
           </button>
         </div>
       </div>
@@ -846,29 +818,28 @@ function App(){
   const onlineTvs=(data.tvs||[]).filter(t=>t.status==='online').length;
 
   return (
-    <div style={{display:'flex',height:'100vh',overflow:'hidden',background:'var(--bg)'}}>
+    <div style={{display:'flex',height:'100vh',overflow:'hidden',background:'#F5F7FA'}}>
       <Sidebar page={page} setPage={setPage} logout={logout} username={username} reloadTVs={reloadTVs} reloading={reloading} tvs={data.tvs||[]}/>
       <div id="main-content" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
         {/* ── TOP HEADER ── */}
-        <div id="top-header">
+        <div id="top-header" style={{background:'rgba(255,255,255,.92)',borderBottom:'1px solid #E2E8F0'}}>
           <div style={{flex:1,display:'flex',alignItems:'center',gap:8,minWidth:0}}>
-            <span style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:14,color:'var(--text)',letterSpacing:'-.01em'}}>{PAGE_LABELS[page]||page}</span>
-            <span style={{color:'var(--border2)'}}>·</span>
-            <span style={{fontSize:11.5,color:'var(--text3)'}}>SmartVision Pro</span>
+            <span style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontWeight:700,fontSize:14,color:'#1E293B'}}>{PAGE_LABELS[page]||page}</span>
+            <span style={{color:'#CBD5E1',fontSize:12}}>·</span>
+            <span style={{fontSize:12,color:'#94A3B8'}}>SmartVision Pro</span>
           </div>
-          {/* Status indicators */}
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            <div style={{display:'flex',alignItems:'center',gap:5,background:'var(--green-soft)',border:'1px solid rgba(0,217,126,.2)',borderRadius:20,padding:'4px 10px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:5,background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:20,padding:'4px 10px'}}>
               <div className="dot-online" style={{width:6,height:6}}/>
-              <span style={{fontSize:11,color:'var(--green)',fontWeight:600,letterSpacing:'.02em'}}>Online</span>
+              <span style={{fontSize:11,color:'#16A34A',fontWeight:600}}>Online</span>
             </div>
             {(data.tvs||[]).length>0&&(
-              <div style={{display:'flex',alignItems:'center',gap:5,background:'var(--blue-soft)',border:'1px solid rgba(0,87,255,.2)',borderRadius:20,padding:'4px 10px'}}>
-                <span style={{fontSize:11,color:'var(--blue2)',fontWeight:600}}>📺 {onlineTvs}/{(data.tvs||[]).length} TVs</span>
+              <div style={{display:'flex',alignItems:'center',gap:5,background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:20,padding:'4px 10px'}}>
+                <span style={{fontSize:11,color:'#2563EB',fontWeight:600}}>📺 {onlineTvs}/{(data.tvs||[]).length} TVs</span>
               </div>
             )}
-            <div style={{width:1,height:20,background:'var(--border)',margin:'0 4px'}}/>
-            <div style={{width:30,height:30,borderRadius:8,background:'linear-gradient(135deg,var(--blue),var(--blue3))',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,cursor:'pointer',boxShadow:'0 2px 8px var(--blue-glow)'}} title={username}>
+            <div style={{width:1,height:20,background:'#E2E8F0',margin:'0 4px'}}/>
+            <div style={{width:30,height:30,borderRadius:8,background:'linear-gradient(135deg,#0066FF,#0099FF)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,cursor:'pointer',color:'#fff',boxShadow:'0 2px 8px rgba(0,102,255,.25)'}} title={username}>
               {username?.[0]?.toUpperCase()||'A'}
             </div>
           </div>
@@ -890,8 +861,8 @@ function App(){
       </div>
       <MobileDrawer page={page} setPage={setPage} logout={logout} username={username} reloadTVs={reloadTVs} reloading={reloading} theme={theme}/>
       {toast&&(
-        <div className="fadein" style={{position:'fixed',bottom:28,right:28,zIndex:9999,background:toast.type==='error'?'rgba(255,59,92,.12)':'var(--bg3)',border:`1px solid ${toast.type==='error'?'rgba(255,59,92,.3)':'var(--border2)'}`,color:toast.type==='error'?'var(--red)':'var(--text)',padding:'13px 18px',borderRadius:'var(--r-lg)',fontSize:13,fontWeight:500,boxShadow:'0 12px 40px rgba(0,0,0,.5)',backdropFilter:'blur(12px)',display:'flex',alignItems:'center',gap:8}}>
-          {toast.type==='success'?'✓':toast.type==='error'?'✗':'·'}&nbsp;{toast.msg}
+        <div className="fadein" style={{position:'fixed',bottom:24,right:24,zIndex:9999,background:toast.type==='error'?'#FEF2F2':'#1E293B',border:`1px solid ${toast.type==='error'?'#FECACA':'#334155'}`,color:toast.type==='error'?'#DC2626':'#F8FAFC',padding:'12px 18px',borderRadius:12,fontSize:13,fontWeight:500,boxShadow:'0 8px 32px rgba(0,0,0,.15)',display:'flex',alignItems:'center',gap:8}}>
+          {toast.type==='success'?'✓':toast.type==='error'?'⚠':'·'}&nbsp;{toast.msg}
         </div>
       )}
     </div>
@@ -903,6 +874,7 @@ function DashboardPage({tvs,playlists,schedules,videos,setPage}){
   const [stats,setStats]=useState(null);
   const [liveStatus,setLiveStatus]=useState([]);
   const [loading,setLoading]=useState(true);
+
   useEffect(()=>{
     Promise.all([
       api.getReportStats().catch(()=>({})),
@@ -923,99 +895,91 @@ function DashboardPage({tvs,playlists,schedules,videos,setPage}){
 
   return (
     <div className="fadein page-content">
-      {/* Page header */}
-      <div style={{marginBottom:28,display:'flex',alignItems:'flex-start',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+
+      {/* ── PAGE HEADER ── */}
+      <div style={{marginBottom:24,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
         <div>
-          <h2 className="page-title" style={{fontSize:24,marginBottom:6}}>
-            {greeting}{', '}
-            <span style={{background:'linear-gradient(135deg,var(--blue2),var(--cyan))',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>Dashboard</span>
-          </h2>
-          <p className="page-sub">Monitoramento em tempo real · {now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</p>
+          <h2 className="page-title">{h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'}, bem-vindo 👋</h2>
+          <p className="page-sub">{now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <div style={{display:'flex',alignItems:'center',gap:6,background:'var(--green-soft)',border:'1px solid rgba(0,217,126,.22)',borderRadius:20,padding:'6px 14px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:20,padding:'6px 14px'}}>
             <div className="dot-online"/>
-            <span style={{fontSize:12,color:'var(--green)',fontWeight:600}}>Todos os sistemas operacionais</span>
+            <span style={{fontSize:12,color:'#16A34A',fontWeight:600}}>Todos os sistemas operacionais</span>
           </div>
         </div>
       </div>
 
-      {/* KPI Row */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(155px,1fr))',gap:12,marginBottom:20}}>
-        <div className="fadein stagger-1">
-          <StatCard icon="📺" label="TVs Online" value={loading?'—':`${onlineCount}/${tvs.length}`}
-            color={onlineCount===tvs.length&&tvs.length>0?'green':onlineCount>0?'yellow':'red'}
-            sub={onlineCount===tvs.length&&tvs.length>0?'Todas operando':offlineCount>0?`${offlineCount} offline`:''}
-            onClick={()=>setPage('tvs')}/>
-        </div>
-        <div className="fadein stagger-2">
-          <StatCard icon="🎬" label="Mídias" value={videos.length} color="blue" onClick={()=>setPage('videos')}
-            sub={`${videos.filter(v=>v.media_type==='video').length} vídeos`}/>
-        </div>
-        <div className="fadein stagger-2">
-          <StatCard icon="📋" label="Playlists" value={playlists.length} color="purple" onClick={()=>setPage('playlists')}/>
-        </div>
-        <div className="fadein stagger-3">
-          <StatCard icon="📅" label="Agendamentos" value={activeScheds} color="yellow" sub="Ativos" onClick={()=>setPage('schedules')}/>
-        </div>
-        {stats&&<div className="fadein stagger-4">
-          <StatCard icon="▶" label="Reproduções hoje" value={stats.playsToday||0} color="green"/>
-        </div>}
+      {/* ── KPI CARDS ── */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:12,marginBottom:20}}>
+        <div className="stagger-1 fadein"><StatCard icon="📺" label="TVs Online" value={loading?'—':`${onlineCount}`} color={onlineCount===tvs.length&&tvs.length>0?'green':offlineCount>0?'yellow':'blue'} sub={`de ${tvs.length} cadastradas`} onClick={()=>setPage('tvs')}/></div>
+        <div className="stagger-1 fadein"><StatCard icon="🔴" label="TVs Offline" value={loading?'—':offlineCount} color={offlineCount>0?'red':'green'} sub={offlineCount>0?'Requer atenção':'Tudo normal'} onClick={()=>setPage('tvs')}/></div>
+        <div className="stagger-2 fadein"><StatCard icon="🎬" label="Mídias" value={videos.length} color="blue" sub={`${videos.filter(v=>v.media_type==='video').length} vídeos`} onClick={()=>setPage('videos')}/></div>
+        <div className="stagger-2 fadein"><StatCard icon="📋" label="Playlists" value={playlists.length} color="purple" onClick={()=>setPage('playlists')}/></div>
+        <div className="stagger-3 fadein"><StatCard icon="📅" label="Agendamentos" value={activeScheds} color="yellow" sub="Ativos" onClick={()=>setPage('schedules')}/></div>
+        {stats&&<div className="stagger-3 fadein"><StatCard icon="▶" label="Reproduções hoje" value={stats.playsToday||0} color="green"/></div>}
       </div>
 
-      {/* Main grid */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 300px',gap:16,marginBottom:16}}>
-        {/* TV Monitor */}
-        <div className="panel">
+      {/* ── MAIN GRID ── */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 280px',gap:16,marginBottom:16}}>
+
+        {/* TV Monitor table */}
+        <div className="panel fadein stagger-2">
           <div className="panel-header">
             <div>
-              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{width:8,height:8,borderRadius:4,background:'var(--green)',boxShadow:'0 0 6px var(--green)',display:'inline-block',animation:'pulse-dot 2.5s ease infinite'}}/>
+              <div className="panel-title" style={{display:'flex',alignItems:'center',gap:7}}>
+                <div className="dot-online"/>
                 Monitor de TVs
               </div>
-              <div style={{fontSize:11,color:'var(--text3)',marginTop:2}}>Atualização em tempo real via WebSocket</div>
+              <div style={{fontSize:11.5,color:'#94A3B8',marginTop:1}}>Status atualizado em tempo real</div>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
-              <span style={{fontSize:11,fontWeight:600,padding:'3px 10px',borderRadius:20,background:'var(--blue-soft)',color:'var(--blue2)',border:'1px solid rgba(0,87,255,.2)'}}>{liveStatus.length} TVs</span>
-              <button onClick={()=>setPage('tvs')} style={{fontSize:11,color:'var(--blue2)',background:'none',border:'none',cursor:'pointer',fontWeight:600}}>Ver todas →</button>
+              {liveStatus.length>0&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:20,background:'#EFF6FF',color:'#2563EB',border:'1px solid #BFDBFE',fontWeight:600}}>{liveStatus.length} TVs</span>}
+              <button onClick={()=>setPage('tvs')} style={{fontSize:12,color:'#0066FF',background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:'4px 8px',borderRadius:6,transition:'background .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='#EFF6FF'}
+                onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                Ver todas →
+              </button>
             </div>
           </div>
-          <div style={{maxHeight:340,overflowY:'auto'}}>
+          <div style={{maxHeight:360,overflowY:'auto'}}>
             {loading&&[1,2,3,4].map(i=>(
-              <div key={i} style={{padding:'14px 20px',borderBottom:'1px solid var(--border)',display:'flex',gap:12,alignItems:'center'}}>
-                <div className="skeleton" style={{width:7,height:7,borderRadius:'50%'}}/>
-                <div style={{flex:1}}><div className="skeleton" style={{height:13,marginBottom:5,width:'60%'}}/><div className="skeleton" style={{height:10,width:'40%'}}/></div>
-                <div className="skeleton" style={{width:50,height:20,borderRadius:10}}/>
+              <div key={i} style={{padding:'13px 18px',borderBottom:'1px solid #F1F5F9',display:'flex',gap:12,alignItems:'center'}}>
+                <div className="skeleton" style={{width:7,height:7,borderRadius:'50%',flexShrink:0}}/>
+                <div style={{flex:1}}><div className="skeleton" style={{height:12,marginBottom:5,width:'55%'}}/><div className="skeleton" style={{height:10,width:'35%'}}/></div>
+                <div className="skeleton" style={{width:52,height:20,borderRadius:10}}/>
               </div>
             ))}
             {!loading&&liveStatus.length===0&&(
-              <div style={{padding:'40px',textAlign:'center',color:'var(--text3)',fontSize:13}}>
+              <div style={{padding:'40px',textAlign:'center',color:'#94A3B8'}}>
                 <div style={{fontSize:32,marginBottom:8}}>📺</div>
-                Nenhuma TV cadastrada
+                <div style={{fontWeight:500}}>Nenhuma TV cadastrada</div>
+                <button onClick={()=>setPage('tvs')} style={{marginTop:10,fontSize:12,color:'#0066FF',background:'none',border:'none',cursor:'pointer',fontWeight:600}}>Adicionar TV →</button>
               </div>
             )}
             {!loading&&liveStatus.map((tv,i)=>(
-              <div key={tv.id} style={{padding:'12px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:12,transition:'background .15s',cursor:'pointer'}}
+              <div key={tv.id}
+                style={{padding:'12px 18px',borderBottom:'1px solid #F8FAFC',display:'flex',alignItems:'center',gap:12,cursor:'pointer',transition:'background .12s'}}
                 onClick={()=>setPage('tvs')}
-                onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.022)'}
+                onMouseEnter={e=>e.currentTarget.style.background='#F8FAFC'}
                 onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                 <div className={tv.status==='online'?'dot-online':'dot-offline'} style={{flexShrink:0}}/>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:500,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{tv.name}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:'#1E293B',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{tv.name}</div>
                   {tv.status==='online'&&tv.current_video?(
-                    <div style={{fontSize:11,color:'var(--text3)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',display:'flex',alignItems:'center',gap:4,marginTop:1}}>
-                      <span style={{width:3,height:3,borderRadius:'50%',background:'var(--blue2)',display:'inline-block',animation:'pulse-dot 1.5s ease infinite'}}/>
+                    <div style={{fontSize:11,color:'#64748B',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginTop:1,display:'flex',alignItems:'center',gap:4}}>
+                      <span style={{width:4,height:4,borderRadius:'50%',background:'#22C55E',display:'inline-block'}}/>
                       {tv.current_video}
                     </div>
                   ):(
-                    <div style={{fontSize:11,color:tv.status==='online'?'var(--text3)':'var(--red)',opacity:.8,marginTop:1}}>
-                      {tv.status==='offline'?(tv.minutesAgo<60?`${tv.minutesAgo}min atrás`:tv.minutesAgo<1440?`${Math.round(tv.minutesAgo/60)}h atrás`:'Nunca visto'):'Aguardando...'}
+                    <div style={{fontSize:11,color:tv.status==='offline'?'#EF4444':'#94A3B8',marginTop:1}}>
+                      {tv.status==='offline'?(tv.minutesAgo<60?`Offline há ${tv.minutesAgo}min`:tv.minutesAgo<1440?`Offline há ${Math.round(tv.minutesAgo/60)}h`:'Nunca visto'):'Aguardando conteúdo...'}
                     </div>
                   )}
                 </div>
                 <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
                   <span className={`badge-${tv.status==='online'?'online':'offline'}`}>{tv.status==='online'?'Online':'Offline'}</span>
-                  {tv.playlist_name&&<span style={{fontSize:10,color:'var(--text3)',maxWidth:90,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{tv.playlist_name}</span>}
+                  {tv.playlist_name&&<span style={{fontSize:10,color:'#94A3B8',maxWidth:80,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{tv.playlist_name}</span>}
                 </div>
               </div>
             ))}
@@ -1024,52 +988,59 @@ function DashboardPage({tvs,playlists,schedules,videos,setPage}){
 
         {/* Side panels */}
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          {/* System status */}
-          <div className="panel" style={{padding:'18px 18px'}}>
-            <div className="panel-title" style={{marginBottom:14}}>⚡ Status do Sistema</div>
+          {/* System overview */}
+          <div className="panel fadein stagger-3" style={{padding:'16px 18px'}}>
+            <div className="panel-title" style={{marginBottom:14,display:'flex',alignItems:'center',gap:6}}>
+              <span style={{width:8,height:8,borderRadius:2,background:'#0066FF',display:'inline-block'}}/>
+              Visão Geral
+            </div>
             {[
-              {label:'TVs cadastradas',value:tvs.length,color:'var(--blue2)'},
-              {label:'Online agora',value:onlineCount,color:'var(--green)'},
-              {label:'Playlists ativas',value:playlists.length,color:'var(--purple)'},
-              {label:'Agendamentos',value:activeScheds,color:'var(--yellow)'},
-              {label:'Total de mídias',value:videos.length,color:'var(--blue3)'},
+              {label:'TVs cadastradas',value:tvs.length,color:'#2563EB'},
+              {label:'Online agora',value:onlineCount,color:'#16A34A'},
+              {label:'Playlists',value:playlists.length,color:'#7C3AED'},
+              {label:'Agendamentos ativos',value:activeScheds,color:'#D97706'},
+              {label:'Total de mídias',value:videos.length,color:'#0891B2'},
             ].map((item,i)=>(
-              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',paddingBottom:10,marginBottom:10,borderBottom:'1px solid var(--border)',':last-child':{borderBottom:'none'}}}>
-                <span style={{fontSize:12,color:'var(--text3)'}}>{item.label}</span>
-                <span style={{fontSize:14,fontWeight:800,color:item.color,fontFamily:"'Syne',sans-serif"}}>{item.value}</span>
+              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:i<4?'1px solid #F1F5F9':'none'}}>
+                <span style={{fontSize:12.5,color:'#64748B'}}>{item.label}</span>
+                <span style={{fontSize:15,fontWeight:800,color:item.color,fontFamily:"'Plus Jakarta Sans',sans-serif"}}>{item.value}</span>
               </div>
             ))}
           </div>
 
           {/* Top media */}
           {stats?.topMedia?.length>0&&(
-            <div className="panel" style={{padding:'18px 18px',flex:1}}>
-              <div className="panel-title" style={{marginBottom:14}}>🏆 Top Mídias (7d)</div>
-              <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                {stats.topMedia.slice(0,4).map((m,i)=>(
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:8}}>
-                    <span style={{fontSize:9,fontWeight:800,color:'var(--text3)',width:14,flexShrink:0}}>{i+1}</span>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:11.5,color:'var(--text)',fontWeight:500,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',marginBottom:4}}>{m.video_name||'—'}</div>
-                      <div style={{height:2,background:'var(--bg3)',borderRadius:2}}>
-                        <div style={{height:2,borderRadius:2,background:'linear-gradient(90deg,var(--blue),var(--cyan))',width:`${Math.min(100,Math.round((m.plays/(stats.topMedia[0]?.plays||1))*100))}%`,transition:'width .6s ease'}}/>
-                      </div>
-                    </div>
-                    <span style={{fontSize:11,color:'var(--blue2)',fontWeight:700,flexShrink:0}}>{m.plays}×</span>
-                  </div>
-                ))}
+            <div className="panel fadein stagger-4" style={{padding:'16px 18px',flex:1}}>
+              <div className="panel-title" style={{marginBottom:14,display:'flex',alignItems:'center',gap:6}}>
+                <span style={{width:8,height:8,borderRadius:2,background:'#F59E0B',display:'inline-block'}}/>
+                Top Mídias (7d)
               </div>
+              {stats.topMedia.slice(0,4).map((m,i)=>(
+                <div key={i} style={{marginBottom:10}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                    <span style={{fontSize:11.5,color:'#1E293B',fontWeight:500,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',paddingRight:8}}>{m.video_name||'—'}</span>
+                    <span style={{fontSize:11,color:'#0066FF',fontWeight:700,flexShrink:0}}>{m.plays}×</span>
+                  </div>
+                  <div style={{height:3,background:'#F1F5F9',borderRadius:2}}>
+                    <div style={{height:3,borderRadius:2,background:'linear-gradient(90deg,#0066FF,#0099FF)',width:`${Math.min(100,Math.round((m.plays/(stats.topMedia[0]?.plays||1))*100))}%`,transition:'width .6s ease'}}/>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* Active schedules */}
+      {/* ── ACTIVE SCHEDULES ── */}
       {schedules.filter(s=>s.active).length>0&&(
-        <div className="panel">
+        <div className="panel fadein">
           <div className="panel-header">
             <span className="panel-title">📅 Agendamentos Ativos</span>
-            <button onClick={()=>setPage('schedules')} style={{fontSize:11,color:'var(--blue2)',background:'none',border:'none',cursor:'pointer',fontWeight:600}}>Ver todos →</button>
+            <button onClick={()=>setPage('schedules')} style={{fontSize:12,color:'#0066FF',background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:'4px 8px',borderRadius:6,transition:'background .15s'}}
+              onMouseEnter={e=>e.currentTarget.style.background='#EFF6FF'}
+              onMouseLeave={e=>e.currentTarget.style.background='none'}>
+              Ver todos →
+            </button>
           </div>
           <div style={{overflowX:'auto'}}>
             <table>
@@ -1077,11 +1048,11 @@ function DashboardPage({tvs,playlists,schedules,videos,setPage}){
               <tbody>
                 {schedules.filter(s=>s.active).slice(0,5).map(s=>(
                   <tr key={s.id}>
-                    <td style={{fontWeight:600}}>{s.name}</td>
-                    <td style={{color:'var(--text2)'}}>{s.playlist_name||'—'}</td>
-                    <td style={{color:'var(--text2)'}}>{s.tv_name||<span style={{color:'var(--text3)'}}>Todas</span>}</td>
-                    <td><span style={{fontFamily:'monospace',fontSize:12,color:'var(--blue2)',background:'var(--blue-soft)',padding:'2px 8px',borderRadius:6}}>{s.start_time||'?'}–{s.end_time||'?'}</span></td>
-                    <td style={{color:'var(--text3)',fontSize:11}}>{s.days_of_week||'—'}</td>
+                    <td style={{fontWeight:600,color:'#1E293B'}}>{s.name}</td>
+                    <td style={{color:'#64748B'}}>{s.playlist_name||'—'}</td>
+                    <td style={{color:'#64748B'}}>{s.tv_name||<span style={{color:'#94A3B8',fontSize:12}}>Todas</span>}</td>
+                    <td><span style={{fontFamily:'monospace',fontSize:12,color:'#2563EB',background:'#EFF6FF',padding:'2px 8px',borderRadius:6,fontWeight:600}}>{s.start_time||'?'}–{s.end_time||'?'}</span></td>
+                    <td style={{color:'#94A3B8',fontSize:11}}>{s.days_of_week||'—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -2816,7 +2787,7 @@ function ReportsPage({tvs}){
 
   return (
     <div className="p-4 md:p-6 fadein max-w-4xl">
-      <h2 style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:700,color:"var(--text)",marginBottom:20}}>Relatórios & Monitoramento</h2>
+      <h2 style={{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:22,fontWeight:700,color:"var(--text)",marginBottom:20}}>Relatórios & Monitoramento</h2>
       {stats&&<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <StatCard icon="📺" label="TVs" value={stats.tvCount} color="blue"/>
         <StatCard icon="🟢" label="Online agora" value={stats.onlineCount} color="green"/>
