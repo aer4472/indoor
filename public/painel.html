@@ -423,6 +423,7 @@ const api = {
   suspendUser:(id,reason)=>api._f(`${API}/users/${id}/suspend`,{method:'POST',body:JSON.stringify({reason})}).then(r=>r.json()),
   activateUser:(id,days)=>api._f(`${API}/users/${id}/activate`,{method:'POST',body:JSON.stringify({days})}).then(r=>r.json()),
   renewUser:(id,days)=>api._f(`${API}/users/${id}/renew`,{method:'POST',body:JSON.stringify({days})}).then(r=>r.json()),
+  setDemo:(id,days)=>api._f(`${API}/users/${id}/activate`,{method:'POST',body:JSON.stringify({days,demo:true})}).then(r=>r.json()),
   getReportStatus:()=>api._f(`${API}/reports/status`).then(r=>r.json()),
   getReportStats:()=>api._f(`${API}/reports/stats`).then(r=>r.json()),
   getReportPlayback:(tvId,days)=>api._f(`${API}/reports/playback?${tvId?`tv_id=${tvId}&`:''}days=${days||1}&limit=100`).then(r=>r.json()),
@@ -725,6 +726,18 @@ function Sidebar({page,setPage,logout,username,userRole,userPlan,reloadTVs,reloa
 
       {/* Footer */}
       <div style={{padding:'8px',borderTop:'1px solid #E2E8F0'}}>
+
+        {/* WhatsApp Suporte */}
+        <a href="https://wa.me/5591988196385?text=Olá!%20Preciso%20de%20suporte%20no%20SmartVision%20Pro." target="_blank"
+          style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'9px 10px',borderRadius:8,background:'rgba(37,211,102,.08)',border:'1px solid rgba(37,211,102,.2)',color:'#16A34A',fontSize:12,fontWeight:700,textDecoration:'none',marginBottom:6,transition:'background .15s'}}
+          onMouseEnter={e=>e.currentTarget.style.background='rgba(37,211,102,.16)'}
+          onMouseLeave={e=>e.currentTarget.style.background='rgba(37,211,102,.08)'}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#25D366" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+          </svg>
+          Suporte WhatsApp
+        </a>
+
         <button onClick={()=>reloadTVs(null)} disabled={!!reloading}
           style={{width:'100%',display:'flex',alignItems:'center',gap:7,justifyContent:'center',padding:'8px',borderRadius:8,border:'1px solid #E2E8F0',cursor:'pointer',background:'transparent',color:'#64748B',fontSize:12,fontWeight:600,marginBottom:6,transition:'all .18s',fontFamily:"'Inter',sans-serif"}}
           onMouseEnter={e=>{e.currentTarget.style.background='#EFF6FF';e.currentTarget.style.color='#0066FF';e.currentTarget.style.borderColor='#BFDBFE';}}
@@ -959,14 +972,17 @@ function App(){
         {/* ── SUBSCRIPTION WARNING BANNER ── */}
         {subWarning&&subWarning.type==='trial'&&(
           <div style={{background:'linear-gradient(90deg,#EFF6FF,#DBEAFE)',borderBottom:'1px solid #BFDBFE',padding:'8px 24px',display:'flex',alignItems:'center',gap:10,fontSize:13}}>
-            <span style={{fontSize:16}}>🎁</span>
-            <span style={{fontWeight:600,color:'#1E40AF'}}>Período de teste gratuito</span>
+            <span style={{fontSize:16}}>🎯</span>
+            <span style={{fontWeight:600,color:'#1E40AF'}}>Modo demonstração ativo</span>
             <span style={{color:'#3B82F6'}}>—</span>
             <span style={{color:'#1E40AF'}}>
-              {subWarning.days>1?`${subWarning.days} dias restantes`:`Último dia de teste!`}
+              {subWarning.days>1
+                ? `${subWarning.days} dia${subWarning.days!==1?'s':''} restante${subWarning.days!==1?'s':''}`
+                : '⚠️ Último dia de acesso!'}
             </span>
-            <a href="https://wa.me/5591988196385?text=Quero contratar um plano" target="_blank" style={{marginLeft:'auto',padding:'5px 14px',background:'#2563EB',color:'#fff',borderRadius:7,fontSize:12,fontWeight:700,textDecoration:'none'}}>
-              Contratar plano →
+            <a href="https://wa.me/5591988196385?text=Quero contratar um plano do SmartVision Pro!" target="_blank"
+              style={{marginLeft:'auto',padding:'5px 14px',background:'#2563EB',color:'#fff',borderRadius:7,fontSize:12,fontWeight:700,textDecoration:'none',display:'flex',alignItems:'center',gap:5}}>
+              📱 Contratar plano
             </a>
           </div>
         )}
@@ -3521,6 +3537,16 @@ function UsersPage({showToast}){
                             if(r.success){showToast(r.message);load();}else showToast(r.error,'error');
                           }} style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#2563EB',fontWeight:600}}>
                             🔄 Renovar
+                          </button>
+                        )}
+                        {u.username!=='admin'&&(
+                          <button onClick={async()=>{
+                            const days=prompt('Modo demonstração — quantos dias?','3');
+                            if(!days||isNaN(days))return;
+                            const r=await api.setDemo(u.id,parseInt(days));
+                            if(r.success){showToast(`Demo de ${days} dia(s) ativado!`);load();}else showToast(r.error,'error');
+                          }} style={{background:'linear-gradient(135deg,#F5F3FF,#EDE9FE)',border:'1px solid #DDD6FE',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#7C3AED',fontWeight:600}}>
+                            🎯 Demo
                           </button>
                         )}
                         {u.username!=='admin'&&<button onClick={()=>del(u)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 8px',fontSize:11,cursor:'pointer',color:'#94A3B8'}}
