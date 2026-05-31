@@ -149,9 +149,9 @@ router.post('/card', async (req, res, next) => {
 
     const id = `video-${uuidv4().substring(0,8)}`;
     await db.run(
-      `INSERT INTO videos (id, filename, original_name, display_duration, size, mime_type, media_type, config, rotation)
-       VALUES (?, ?, ?, ?, 0, 'card', ?, ?, ?)`,
-      [id, id, name.trim(), display_duration, media_type, JSON.stringify(config), rot]
+      `INSERT INTO videos (id, filename, original_name, display_duration, size, mime_type, media_type, config, rotation, user_id)
+       VALUES (?, ?, ?, ?, 0, 'card', ?, ?, ?, ?)`,
+      [id, id, name.trim(), display_duration, media_type, JSON.stringify(config), rot, require("../middleware/tenant").tenantFilter(req).userId || null]
     );
     const row = await db.get('SELECT * FROM videos WHERE id=?', [id]);
     broadcast.contentChanged(null, 'card-created');
@@ -216,11 +216,12 @@ router.post('/upload', upload.single('video'), async (req, res, next) => {
       duration = await getVideoDuration(filePath);
     }
 
+    const { userId: uploadUserId } = require('../middleware/tenant').tenantFilter(req);
     await db.run(
-      `INSERT INTO videos (id, filename, original_name, duration, display_duration, size, mime_type, media_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO videos (id, filename, original_name, duration, display_duration, size, mime_type, media_type, user_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, req.file.filename, req.file.originalname, duration, displayDuration,
-       stats.size, req.file.mimetype, mediaType]
+       stats.size, req.file.mimetype, mediaType, uploadUserId || null]
     );
 
     const video = await db.get('SELECT * FROM videos WHERE id = ?', [id]);
