@@ -296,15 +296,39 @@ tr:hover td { background:var(--bg3); }
 
 /* ── MOBILE ── */
 #sidebar { display:flex; }
-#mobile-nav { display:none; }
-#mobile-drawer { display:none;position:fixed;top:0;left:0;bottom:0;z-index:200;flex-direction:column;width:240px;box-shadow:var(--shadow-lg);transition:transform .28s cubic-bezier(.4,0,.2,1); }
-#mobile-drawer.closed { transform:translateX(-100%); }
-#mobile-overlay { display:none;position:fixed;inset:0;z-index:199;background:rgba(15,23,42,.4);backdrop-filter:blur(4px); }
-#mobile-menu-btn { display:none;position:fixed;top:12px;left:12px;z-index:201;width:36px;height:36px;border-radius:8px;border:none;cursor:pointer;align-items:center;justify-content:center;font-size:15px;background:var(--bg2);border:1px solid var(--border);color:var(--text);box-shadow:var(--shadow); }
+#mobile-drawer { 
+  display:flex;flex-direction:column;
+  position:fixed;top:0;left:0;bottom:0;z-index:10000;
+  width:260px;
+  background:#fff;
+  box-shadow:4px 0 32px rgba(0,0,0,.15);
+  transform:translateX(-100%);
+  transition:transform .28s cubic-bezier(.4,0,.2,1);
+}
+#mobile-drawer.open { transform:translateX(0); }
+#mobile-overlay { 
+  display:none;
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(15,23,42,.45);
+  backdrop-filter:blur(3px);
+}
+#mobile-overlay.show { display:block; }
+#mobile-menu-btn { 
+  display:none;
+  position:fixed;top:10px;left:10px;z-index:200;
+  width:38px;height:38px;border-radius:9px;
+  border:1px solid #E2E8F0;cursor:pointer;
+  align-items:center;justify-content:center;
+  font-size:18px;
+  background:#fff;
+  color:#1E293B;
+  box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
 @media(max-width:768px){
-  #sidebar{display:none!important}
-  #mobile-menu-btn{display:flex!important}
-  .page-content{padding:16px!important}
+  #sidebar { display:none!important; }
+  #mobile-menu-btn { display:flex!important; }
+  .page-content { padding:14px!important; }
+  #top-header { padding:0 14px 0 56px!important; }
 }
 
 /* ── TAILWIND OVERRIDES FOR LIGHT ── */
@@ -727,64 +751,106 @@ function Sidebar({page,setPage,logout,username,userRole,userPlan,reloadTVs,reloa
   );
 }
 
-function MobileDrawer({page,setPage,logout,username,reloadTVs,reloading,theme={}}){
+function MobileDrawer({page,setPage,logout,username,userRole,reloadTVs,reloading}){
   const [open,setOpen]=useState(false);
-  const bg  = theme.sidebarBg    || '#111827';
-  const txt = theme.sidebarText  || '#9ca3af';
-  const act = theme.sidebarActive|| '#2563eb';
-  const name = theme.panelName   || 'SmartVision Pro';
-  const logo = theme.panelLogo   || '';
+  const isAdmin = userRole === 'admin';
+  const roleLabel = userRole==='admin'?'Administrador':userRole==='operator'?'Operador':'Visualizador';
 
   const go=(id)=>{setPage(id);setOpen(false);};
 
+  const GROUPS=[
+    {label:'Principal',items:[
+      {id:'dashboard',icon:'⊞',label:'Dashboard'},
+      {id:'tvs',icon:'▣',label:'TVs'},
+    ]},
+    {label:'Conteúdo',items:[
+      {id:'videos',icon:'▶',label:'Mídias'},
+      {id:'playlists',icon:'☰',label:'Playlists'},
+      {id:'schedules',icon:'◷',label:'Agendamentos'},
+    ]},
+    {label:'Recursos',items:[
+      {id:'widgets',icon:'⊹',label:'Widgets'},
+      ...(isAdmin?[
+        {id:'sponsors',icon:'◈',label:'Patrocinadores'},
+        {id:'emergency',icon:'⚡',label:'Emergência'},
+      ]:[]),
+    ]},
+    {label:'Sistema',items:[
+      ...(isAdmin?[
+        {id:'plans',icon:'◈',label:'Planos'},
+        {id:'users',icon:'◎',label:'Usuários'},
+        {id:'reports',icon:'↗',label:'Relatórios'},
+      ]:[]),
+      {id:'settings',icon:'⚙',label:'Aparência'},
+    ]},
+  ];
+
   return (<>
-    {/* Botão hamburguer */}
-    <button id="mobile-menu-btn" onClick={()=>setOpen(true)} style={{background:bg,color:'#fff'}}>☰</button>
+    {/* Hamburger button */}
+    <button id="mobile-menu-btn" onClick={()=>setOpen(true)}>☰</button>
 
-    {/* Overlay escuro */}
-    <div id="mobile-overlay" onClick={()=>setOpen(false)}
-      style={{opacity:open?1:0,pointerEvents:open?'auto':'none',transition:'opacity .28s'}}/>
+    {/* Overlay */}
+    <div id="mobile-overlay" className={open?'show':''} onClick={()=>setOpen(false)}/>
 
-    {/* Drawer lateral */}
-    <div id="mobile-drawer" className={open?'':'closed'} style={{background:"var(--sidebar)"}}>
+    {/* Drawer */}
+    <div id="mobile-drawer" className={open?'open':''}>
       {/* Header */}
-      <div style={{padding:'16px 14px 12px',borderBottom:'1px solid rgba(255,255,255,.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          {logo
-            ? <img src={logo} alt="" style={{height:28,maxWidth:90,objectFit:'contain',borderRadius:3}}/>
-            : <><span style={{fontSize:20}}>📺</span><span style={{fontWeight:700,fontSize:13,color:'#fff'}}>{name}</span></>
-          }
-        </div>
-        <button onClick={()=>setOpen(false)} style={{background:'rgba(255,255,255,.1)',border:'none',borderRadius:8,width:30,height:30,color:'#fff',fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>✕</button>
+      <div style={{padding:'16px',borderBottom:'1px solid #E2E8F0',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <img src="/logo.png" alt="SmartVision Pro" style={{height:30,objectFit:'contain',maxWidth:140}}/>
+        <button onClick={()=>setOpen(false)}
+          style={{background:'#F1F5F9',border:'none',borderRadius:8,width:32,height:32,cursor:'pointer',fontSize:16,display:'flex',alignItems:'center',justifyContent:'center',color:'#64748B'}}>
+          ✕
+        </button>
       </div>
-      <p style={{fontSize:11,color:'rgba(255,255,255,.3)',padding:'6px 14px 2px'}}>{username}</p>
 
-      {/* Nav items */}
-      <nav style={{flex:1,padding:'6px 8px',overflowY:'auto'}}>
-        {NAV.map(i=>{
-          const isA=page===i.id;
-          return <button key={i.id} onClick={()=>go(i.id)}
-            style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:10,border:'none',cursor:'pointer',marginBottom:2,fontSize:14,fontWeight:isA?600:400,background:isA?act:'transparent',color:isA?'#fff':txt,textAlign:'left'}}>
-            <span style={{fontSize:18}}>{i.icon}</span>{i.label}
-          </button>;
-        })}
+      {/* Nav */}
+      <nav style={{flex:1,overflowY:'auto',padding:'6px 8px'}}>
+        {GROUPS.map(g=>(
+          <div key={g.label} style={{marginBottom:4}}>
+            <div style={{fontSize:10,fontWeight:700,color:'#CBD5E1',letterSpacing:'.08em',padding:'8px 8px 4px',textTransform:'uppercase'}}>
+              {g.label}
+            </div>
+            {g.items.map(i=>{
+              const isActive=page===i.id;
+              return(
+                <button key={i.id} onClick={()=>go(i.id)}
+                  style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderRadius:8,border:'none',cursor:'pointer',fontSize:13,fontWeight:isActive?600:400,background:isActive?'#EFF6FF':'transparent',color:isActive?'#0066FF':'#475569',textAlign:'left',marginBottom:1}}>
+                  <span style={{fontSize:14,opacity:.8}}>{i.icon}</span>
+                  {i.label}
+                  {isActive&&<div style={{marginLeft:'auto',width:6,height:6,borderRadius:3,background:'#0066FF'}}/>}
+                </button>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Footer */}
-      <div style={{padding:'8px',borderTop:'1px solid rgba(255,255,255,.07)'}}>
-        <button onClick={()=>{reloadTVs(null);setOpen(false);}} disabled={!!reloading}
-          style={{width:'100%',padding:'10px',borderRadius:10,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,background:'rgba(255,255,255,.07)',color:txt,display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:6}}>
-          <span className={reloading?'inline-block animate-spin':''}>🔄</span>
-          {reloading?'Recarregando...':'Recarregar TVs'}
+      <div style={{padding:'8px',borderTop:'1px solid #E2E8F0',flexShrink:0}}>
+        <button onClick={()=>{reloadTVs&&reloadTVs(null);setOpen(false);}} disabled={!!reloading}
+          style={{width:'100%',padding:'10px',borderRadius:8,border:'1px solid #E2E8F0',cursor:'pointer',fontSize:12,fontWeight:600,background:'#F8FAFC',color:'#64748B',display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginBottom:6}}>
+          ↺ {reloading?'Recarregando...':'Recarregar TVs'}
         </button>
-        <button onClick={()=>{logout();setOpen(false);}}
-          style={{width:'100%',padding:'8px',borderRadius:10,border:'none',cursor:'pointer',fontSize:12,color:'rgba(255,255,255,.35)',background:'transparent',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
-          🚪 Sair
-        </button>
+        <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',borderRadius:8,background:'#F8FAFC',border:'1px solid #E2E8F0'}}>
+          <div style={{width:28,height:28,borderRadius:7,background:'linear-gradient(135deg,#0066FF,#0099FF)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,fontWeight:700,color:'#fff',flexShrink:0}}>
+            {username?.[0]?.toUpperCase()||'A'}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:12.5,fontWeight:700,color:'#1E293B',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{username||'Admin'}</div>
+            <div style={{fontSize:10.5,color:'#94A3B8'}}>{roleLabel}</div>
+          </div>
+          <button onClick={()=>{logout();setOpen(false);}}
+            style={{background:'none',border:'none',cursor:'pointer',color:'#CBD5E1',fontSize:16,padding:4,borderRadius:6}}
+            onMouseEnter={e=>e.currentTarget.style.color='#EF4444'}
+            onMouseLeave={e=>e.currentTarget.style.color='#CBD5E1'}>
+            ⏻
+          </button>
+        </div>
       </div>
     </div>
   </>);
 }
+
 
 // ── APP ──────────────────────────────────────────────────────────
 function App(){
@@ -912,7 +978,7 @@ function App(){
           {page==='settings'   && <AppearancePage {...props}/>}
         </div>
       </div>
-      <MobileDrawer page={page} setPage={setPage} logout={logout} username={username} reloadTVs={reloadTVs} reloading={reloading} theme={theme}/>
+      <MobileDrawer page={page} setPage={setPage} logout={logout} username={username} userRole={userRole} reloadTVs={reloadTVs} reloading={reloading}/>
       {toast&&(
         <div className="fadein" style={{position:'fixed',bottom:24,right:24,zIndex:9999,background:toast.type==='error'?'#FEF2F2':'#1E293B',border:`1px solid ${toast.type==='error'?'#FECACA':'#334155'}`,color:toast.type==='error'?'#DC2626':'#F8FAFC',padding:'12px 18px',borderRadius:12,fontSize:13,fontWeight:500,boxShadow:'0 8px 32px rgba(0,0,0,.15)',display:'flex',alignItems:'center',gap:8}}>
           {toast.type==='success'?'✓':toast.type==='error'?'⚠':'·'}&nbsp;{toast.msg}
