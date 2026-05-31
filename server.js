@@ -38,6 +38,34 @@ io.on('connection', (socket) => {
   });
 });
 
+// Verificar trials e assinaturas vencidas — roda a cada hora
+cron.schedule('0 * * * *', async () => {
+  try {
+    // Marcar trials vencidos
+    const expiredTrials = await db.run(
+      `UPDATE users SET account_status = 'expired'
+       WHERE account_status = 'trial'
+         AND trial_ends_at IS NOT NULL
+         AND trial_ends_at < NOW()`,
+      []
+    );
+    // Marcar assinaturas vencidas
+    const expiredSubs = await db.run(
+      `UPDATE users SET account_status = 'expired'
+       WHERE account_status = 'active'
+         AND subscription_ends_at IS NOT NULL
+         AND subscription_ends_at < NOW()
+         AND role != 'admin'`,
+      []
+    );
+    if ((expiredTrials.changes || 0) + (expiredSubs.changes || 0) > 0) {
+      console.log(`⏰ Contas expiradas: ${expiredTrials.changes || 0} trials, ${expiredSubs.changes || 0} assinaturas`);
+    }
+  } catch(e) {
+    console.error('Cron expiration error:', e.message);
+  }
+});
+
 // Detectar TVs offline a cada 2 min
 cron.schedule('*/2 * * * *', async () => {
   const threshold = new Date(Date.now() - 3*60*1000).toISOString();

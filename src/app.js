@@ -17,6 +17,7 @@ const {
 } = require('./middleware/security');
 
 const { authMiddleware } = require('./middleware/auth');
+const { checkSubscription } = require('./middleware/subscription');
 
 const app = express();
 
@@ -60,12 +61,12 @@ app.use('/api/settings',  authMiddleware, apiLimiter, require('./routes/settings
 app.use('/api/backup',    authMiddleware, apiLimiter, require('./routes/backup'));
 app.use('/api/files',     authMiddleware, apiLimiter, require('./routes/filebrowser'));
 app.use('/api/sponsors',  authMiddleware, apiLimiter, require('./routes/sponsors'));
-app.use('/api/tvs',       authMiddleware, apiLimiter, require('./routes/tvs').router);
-app.use('/api/playlists', authMiddleware, apiLimiter, require('./routes/PlayLists').router);
-app.use('/api/videos',    authMiddleware, apiLimiter, require('./routes/videos'));
-app.use('/api/schedules', authMiddleware, apiLimiter, require('./routes/schedules'));
+app.use('/api/tvs',       authMiddleware, checkSubscription, apiLimiter, require('./routes/tvs').router);
+app.use('/api/playlists', authMiddleware, checkSubscription, apiLimiter, require('./routes/PlayLists').router);
+app.use('/api/videos',    authMiddleware, checkSubscription, apiLimiter, require('./routes/videos'));
+app.use('/api/schedules', authMiddleware, checkSubscription, apiLimiter, require('./routes/schedules'));
 app.use('/api/emergency', authMiddleware, apiLimiter, require('./routes/emergency'));
-app.use('/api/widgets',   authMiddleware, apiLimiter, require('./routes/widgets'));
+app.use('/api/widgets',   authMiddleware, checkSubscription, apiLimiter, require('./routes/widgets'));
 app.use('/api/users',     authMiddleware, apiLimiter, require('./routes/users'));
 app.use('/api/plans',     authMiddleware, apiLimiter, require('./routes/plans'));
 app.use('/api/reports',   authMiddleware, apiLimiter, require('./routes/reports'));

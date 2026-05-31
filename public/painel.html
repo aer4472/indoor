@@ -420,6 +420,9 @@ const api = {
   updatePlan:(id,d)=>api._f(`${API}/plans/${id}`,{method:'PUT',body:JSON.stringify(d)}).then(r=>r.json()),
   deletePlan:id=>api._f(`${API}/plans/${id}`,{method:'DELETE'}).then(r=>r.json()),
   getMe:()=>api._f(`${API}/users/me`).then(r=>r.json()),
+  suspendUser:(id,reason)=>api._f(`${API}/users/${id}/suspend`,{method:'POST',body:JSON.stringify({reason})}).then(r=>r.json()),
+  activateUser:(id,days)=>api._f(`${API}/users/${id}/activate`,{method:'POST',body:JSON.stringify({days})}).then(r=>r.json()),
+  renewUser:(id,days)=>api._f(`${API}/users/${id}/renew`,{method:'POST',body:JSON.stringify({days})}).then(r=>r.json()),
   getReportStatus:()=>api._f(`${API}/reports/status`).then(r=>r.json()),
   getReportStats:()=>api._f(`${API}/reports/stats`).then(r=>r.json()),
   getReportPlayback:(tvId,days)=>api._f(`${API}/reports/playback?${tvId?`tv_id=${tvId}&`:''}days=${days||1}&limit=100`).then(r=>r.json()),
@@ -857,6 +860,21 @@ function App(){
   const [loggedIn,setLoggedIn]=useState(!!TOKEN);
   const [username,setUsername]=useState(()=>{try{const t=TOKEN&&JSON.parse(atob(TOKEN.split('.')[1]));return t?.username||''}catch{return ''}});
   const [userRole,setUserRole]=useState(()=>{try{const t=TOKEN&&JSON.parse(atob(TOKEN.split('.')[1]));return t?.role||'operator'}catch{return 'operator'}});
+  const [subWarning,setSubWarning]=useState(null);
+
+  // Load subscription status
+  useEffect(()=>{
+    if(!loggedIn) return;
+    api.getMe().then(me=>{
+      if(!me||me.error) return;
+      const days = me.days_remaining;
+      const status = me.account_status;
+      if(status==='trial') setSubWarning({type:'trial',days});
+      else if(status==='expired') setSubWarning({type:'expired',days:0});
+      else if(status==='suspended') setSubWarning({type:'suspended',days:0});
+      else if(days!==null && days<=7) setSubWarning({type:'expiring',days});
+    }).catch(()=>{});
+  },[loggedIn]);
   const [userPlan,setUserPlan]=useState(()=>{try{const t=TOKEN&&JSON.parse(atob(TOKEN.split('.')[1]));return t?.plan||null}catch{return null}});
   const [page,setPage]=useState('dashboard');
   const [data,setData]=useState({tvs:[],videos:[],playlists:[],schedules:[],widgets:[],emergency:{active:0},sponsors:{sponsors:[],config:{}}});
@@ -938,6 +956,51 @@ function App(){
     <div style={{display:'flex',height:'100vh',overflow:'hidden',background:'#F5F7FA'}}>
       <Sidebar page={page} setPage={setPage} logout={logout} username={username} userRole={userRole} userPlan={userPlan} reloadTVs={reloadTVs} reloading={reloading} tvs={data.tvs||[]}/>
       <div id="main-content" style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0,position:'relative'}}>
+        {/* ── SUBSCRIPTION WARNING BANNER ── */}
+        {subWarning&&subWarning.type==='trial'&&(
+          <div style={{background:'linear-gradient(90deg,#EFF6FF,#DBEAFE)',borderBottom:'1px solid #BFDBFE',padding:'8px 24px',display:'flex',alignItems:'center',gap:10,fontSize:13}}>
+            <span style={{fontSize:16}}>🎁</span>
+            <span style={{fontWeight:600,color:'#1E40AF'}}>Período de teste gratuito</span>
+            <span style={{color:'#3B82F6'}}>—</span>
+            <span style={{color:'#1E40AF'}}>
+              {subWarning.days>1?`${subWarning.days} dias restantes`:`Último dia de teste!`}
+            </span>
+            <a href="https://wa.me/5591988196385?text=Quero contratar um plano" target="_blank" style={{marginLeft:'auto',padding:'5px 14px',background:'#2563EB',color:'#fff',borderRadius:7,fontSize:12,fontWeight:700,textDecoration:'none'}}>
+              Contratar plano →
+            </a>
+          </div>
+        )}
+        {subWarning&&subWarning.type==='expiring'&&(
+          <div style={{background:'linear-gradient(90deg,#FFFBEB,#FEF3C7)',borderBottom:'1px solid #FDE68A',padding:'8px 24px',display:'flex',alignItems:'center',gap:10,fontSize:13}}>
+            <span style={{fontSize:16}}>⚠️</span>
+            <span style={{fontWeight:600,color:'#92400E'}}>Sua assinatura vence em</span>
+            <span style={{fontWeight:800,color:'#D97706',fontSize:15}}>{subWarning.days} dia{subWarning.days!==1?'s':''}</span>
+            <a href="https://wa.me/5591988196385?text=Quero renovar meu plano" target="_blank" style={{marginLeft:'auto',padding:'5px 14px',background:'#D97706',color:'#fff',borderRadius:7,fontSize:12,fontWeight:700,textDecoration:'none'}}>
+              Renovar agora →
+            </a>
+          </div>
+        )}
+        {subWarning&&subWarning.type==='expired'&&(
+          <div style={{background:'linear-gradient(90deg,#FEF2F2,#FEE2E2)',borderBottom:'1px solid #FECACA',padding:'8px 24px',display:'flex',alignItems:'center',gap:10,fontSize:13}}>
+            <span style={{fontSize:16}}>🔴</span>
+            <span style={{fontWeight:600,color:'#991B1B'}}>Sua assinatura expirou</span>
+            <span style={{color:'#DC2626'}}>— Acesso às funcionalidades bloqueado</span>
+            <a href="https://wa.me/5591988196385?text=Preciso renovar meu plano" target="_blank" style={{marginLeft:'auto',padding:'5px 14px',background:'#DC2626',color:'#fff',borderRadius:7,fontSize:12,fontWeight:700,textDecoration:'none'}}>
+              Regularizar agora →
+            </a>
+          </div>
+        )}
+        {subWarning&&subWarning.type==='suspended'&&(
+          <div style={{background:'linear-gradient(90deg,#F5F3FF,#EDE9FE)',borderBottom:'1px solid #DDD6FE',padding:'8px 24px',display:'flex',alignItems:'center',gap:10,fontSize:13}}>
+            <span style={{fontSize:16}}>🚫</span>
+            <span style={{fontWeight:600,color:'#5B21B6'}}>Conta suspensa</span>
+            <span style={{color:'#7C3AED'}}>— Entre em contato com o administrador</span>
+            <a href="https://wa.me/5591988196385" target="_blank" style={{marginLeft:'auto',padding:'5px 14px',background:'#7C3AED',color:'#fff',borderRadius:7,fontSize:12,fontWeight:700,textDecoration:'none'}}>
+              Falar com suporte →
+            </a>
+          </div>
+        )}
+
         {/* ── TOP HEADER ── */}
         <div id="top-header" style={{background:'rgba(255,255,255,.92)',borderBottom:'1px solid #E2E8F0'}}>
           <div style={{flex:1,display:'flex',alignItems:'center',gap:8,minWidth:0}}>
@@ -3355,7 +3418,7 @@ function UsersPage({showToast}){
         <div style={{overflowX:'auto'}}>
           <table>
             <thead><tr>
-              <th>Usuário</th><th>Função</th><th>Plano</th><th>TVs</th><th>Criado em</th><th>Ações</th>
+              <th>Usuário</th><th>Função</th><th>Plano</th><th>TVs</th><th>Status</th><th>Vencimento</th><th>Ações</th>
             </tr></thead>
             <tbody>
               {users.map(u=>{
@@ -3402,15 +3465,65 @@ function UsersPage({showToast}){
                         <span style={{fontSize:11,color:'#94A3B8'}}>—</span>
                       )}
                     </td>
-                    <td style={{fontSize:12,color:'#94A3B8'}}>{fmt.dt(u.created_at)}</td>
                     <td>
-                      <div style={{display:'flex',gap:6}}>
+                      {(()=>{
+                        const s=u.account_status||'active';
+                        const cfg={
+                          active:  {bg:'#F0FDF4',color:'#16A34A',border:'#BBF7D0',label:'Ativo'},
+                          trial:   {bg:'#EFF6FF',color:'#2563EB',border:'#BFDBFE',label:'Trial'},
+                          expired: {bg:'#FEF2F2',color:'#DC2626',border:'#FECACA',label:'Expirado'},
+                          suspended:{bg:'#F5F3FF',color:'#7C3AED',border:'#DDD6FE',label:'Suspenso'},
+                        }[s]||{bg:'#F1F5F9',color:'#64748B',border:'#E2E8F0',label:s};
+                        return <span style={{fontSize:11,fontWeight:700,padding:'3px 9px',borderRadius:20,background:cfg.bg,color:cfg.color,border:`1px solid ${cfg.border}`}}>{cfg.label}</span>;
+                      })()}
+                    </td>
+                    <td style={{fontSize:11.5}}>
+                      {u.account_status==='trial'&&u.trial_ends_at&&(
+                        <span style={{color:'#2563EB'}}>{Math.max(0,Math.ceil((new Date(u.trial_ends_at)-new Date())/(1000*60*60*24)))}d restantes</span>
+                      )}
+                      {u.subscription_ends_at&&u.account_status==='active'&&(
+                        <span style={{color:Math.ceil((new Date(u.subscription_ends_at)-new Date())/(1000*60*60*24))<=7?'#D97706':'#94A3B8'}}>
+                          {fmt.dt(u.subscription_ends_at)}
+                        </span>
+                      )}
+                      {!u.trial_ends_at&&!u.subscription_ends_at&&<span style={{color:'#CBD5E1'}}>—</span>}
+                    </td>
+                    <td>
+                      <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
                         <button onClick={()=>open(u)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 10px',fontSize:11,cursor:'pointer',fontWeight:600,color:'#64748B',transition:'all .15s'}}
                           onMouseEnter={e=>{e.currentTarget.style.background='#EFF6FF';e.currentTarget.style.color='#0066FF';}}
                           onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#64748B';}}>
                           Editar
                         </button>
-                        {u.username!=='admin'&&<button onClick={()=>del(u)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 8px',fontSize:11,cursor:'pointer',color:'#94A3B8',transition:'all .15s'}}
+                        {u.username!=='admin'&&u.account_status!=='suspended'&&(
+                          <button onClick={async()=>{
+                            const r=await api.suspendUser(u.id,'Suspenso pelo admin');
+                            if(r.success){showToast('Conta suspensa');load();}else showToast(r.error,'error');
+                          }} style={{background:'#FEF2F2',border:'1px solid #FECACA',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#DC2626',fontWeight:600}}>
+                            ⏸ Suspender
+                          </button>
+                        )}
+                        {u.username!=='admin'&&(u.account_status==='suspended'||u.account_status==='expired')&&(
+                          <button onClick={async()=>{
+                            const days=prompt('Reativar por quantos dias?','30');
+                            if(!days)return;
+                            const r=await api.activateUser(u.id,parseInt(days));
+                            if(r.success){showToast(r.message);load();}else showToast(r.error,'error');
+                          }} style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#16A34A',fontWeight:600}}>
+                            ▶ Reativar
+                          </button>
+                        )}
+                        {u.username!=='admin'&&u.account_status==='active'&&(
+                          <button onClick={async()=>{
+                            const days=prompt('Renovar por quantos dias?','30');
+                            if(!days)return;
+                            const r=await api.renewUser(u.id,parseInt(days));
+                            if(r.success){showToast(r.message);load();}else showToast(r.error,'error');
+                          }} style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:6,padding:'5px 9px',fontSize:10,cursor:'pointer',color:'#2563EB',fontWeight:600}}>
+                            🔄 Renovar
+                          </button>
+                        )}
+                        {u.username!=='admin'&&<button onClick={()=>del(u)} style={{background:'#F1F5F9',border:'1px solid #E2E8F0',borderRadius:6,padding:'5px 8px',fontSize:11,cursor:'pointer',color:'#94A3B8'}}
                           onMouseEnter={e=>{e.currentTarget.style.background='#FEF2F2';e.currentTarget.style.color='#EF4444';}}
                           onMouseLeave={e=>{e.currentTarget.style.background='#F1F5F9';e.currentTarget.style.color='#94A3B8';}}>
                           🗑
