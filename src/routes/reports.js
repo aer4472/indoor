@@ -34,8 +34,10 @@ router.get('/playback', async (req, res) => {
 
 // Estatísticas resumidas
 router.get('/stats', async (req, res) => {
+  const { tenantFilter } = require('../middleware/tenant');
+  const { isAdmin, userId } = tenantFilter(req);
   const [tvCount, onlineCount, totalPlays, topMedia] = await Promise.all([
-    db.get('SELECT COUNT(*) as n FROM tvs'),
+    db.get(isAdmin ? 'SELECT COUNT(*) as n FROM tvs' : 'SELECT COUNT(*) as n FROM tvs WHERE user_id = $1', isAdmin ? [] : [userId]),
     db.get(isAdmin ? `SELECT COUNT(*) as n FROM tvs WHERE last_seen >= NOW() - INTERVAL '2 minutes'` : `SELECT COUNT(*) as n FROM tvs WHERE last_seen >= NOW() - INTERVAL '2 minutes' AND user_id = $1`, isAdmin ? [] : [userId]),
     db.get(`SELECT COUNT(*) as n FROM playback_log WHERE started_at >= NOW() - INTERVAL '24 hours'`),
     db.all(`SELECT video_name, COUNT(*) as plays FROM playback_log
