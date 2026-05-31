@@ -1,34 +1,33 @@
-const sqlite3 = require('sqlite3').verbose();
-const path    = require('path');
-const fs      = require('fs').promises;
-const bcrypt  = require('bcryptjs');
+const { Pool } = require('pg');
+const bcrypt   = require('bcryptjs');
 
-const DB_PATH = path.join(__dirname, '../../storage/database.db');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
+pool.on('error', (err) => console.error('PostgreSQL pool error:', err));
 
 class Database {
-  constructor() { this.db = null; }
-
   async initialize() {
-    await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
-    await fs.mkdir(path.join(path.dirname(DB_PATH), 'videos'), { recursive: true });
-    return new Promise((resolve, reject) => {
-      this.db = new sqlite3.Database(DB_PATH, async err => {
-        if (err) reject(err);
-        else { await this.createTables(); await this.seedAdmin(); resolve(); }
-      });
-    });
+    console.log('🐘 Conectando ao PostgreSQL (Supabase)...');
+    await this.createTables();
+    await this.runMigrations();
+    await this.seedAdmin();
+    console.log('✅ Banco de dados pronto!');
   }
 
   async createTables() {
-    const schema = `
-      PRAGMA foreign_keys = ON;
-
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         username TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
         role TEXT DEFAULT 'admin',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS tvs (
@@ -38,17 +37,20 @@ class Database {
         orientation TEXT DEFAULT 'horizontal',
         volume INTEGER DEFAULT 100,
         transition TEXT DEFAULT 'fade',
-        last_seen TEXT,
+        last_seen TIMESTAMPTZ,
         status TEXT DEFAULT 'offline',
         current_video TEXT,
         playback_time INTEGER DEFAULT 0,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        pin TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS playlists (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        rotation INTEGER DEFAULT 0,
+        shuffle INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS videos (
@@ -61,40 +63,37 @@ class Database {
         mime_type TEXT,
         media_type TEXT DEFAULT 'video',
         config TEXT DEFAULT '{}',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        rotation INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS playlist_videos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        playlist_id TEXT NOT NULL,
-        video_id TEXT NOT NULL,
-        order_position INTEGER NOT NULL,
-        FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
-        FOREIGN KEY (video_id)    REFERENCES videos(id)    ON DELETE CASCADE
+        id SERIAL PRIMARY KEY,
+        playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+        video_id TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+        order_position INTEGER NOT NULL
       );
 
       CREATE TABLE IF NOT EXISTS schedules (
         id TEXT PRIMARY KEY,
-        tv_id TEXT NOT NULL,
-        playlist_id TEXT NOT NULL,
+        tv_id TEXT NOT NULL REFERENCES tvs(id) ON DELETE CASCADE,
+        playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         start_time TEXT NOT NULL,
         end_time TEXT NOT NULL,
         days TEXT NOT NULL DEFAULT '[0,1,2,3,4,5,6]',
         active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (tv_id)       REFERENCES tvs(id)       ON DELETE CASCADE,
-        FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS emergency (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
+        id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
         active INTEGER DEFAULT 0,
         title TEXT DEFAULT 'AVISO IMPORTANTE',
         message TEXT DEFAULT '',
         bg_color TEXT DEFAULT '#dc2626',
         text_color TEXT DEFAULT '#ffffff',
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMPTZ DEFAULT NOW()
       );
 
       CREATE TABLE IF NOT EXISTS widgets (
@@ -104,33 +103,32 @@ class Database {
         config TEXT NOT NULL DEFAULT '{}',
         position TEXT DEFAULT 'bottom',
         active INTEGER DEFAULT 1,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        tv_ids TEXT DEFAULT '',
+        rotation INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
-      -- Log de reprodução (o que tocou, quando, em qual TV)
       CREATE TABLE IF NOT EXISTS playback_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         tv_id TEXT NOT NULL,
         tv_name TEXT,
         video_name TEXT,
         media_type TEXT,
-        started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        started_at TIMESTAMPTZ DEFAULT NOW(),
         duration_sec INTEGER DEFAULT 0
       );
 
-      -- Log de auditoria (quem fez o quê no painel)
       CREATE TABLE IF NOT EXISTS audit_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user TEXT,
+        id SERIAL PRIMARY KEY,
+        "user" TEXT,
         action TEXT NOT NULL,
         target TEXT,
         detail TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
-      -- Configurações do sistema (logo, cores, nome do painel)
       CREATE TABLE IF NOT EXISTS settings (
-        key   TEXT PRIMARY KEY,
+        key TEXT PRIMARY KEY,
         value TEXT
       );
 
@@ -139,70 +137,59 @@ class Database {
       CREATE INDEX IF NOT EXISTS idx_schedules_tv    ON schedules(tv_id);
       CREATE INDEX IF NOT EXISTS idx_playback_tv     ON playback_log(tv_id);
       CREATE INDEX IF NOT EXISTS idx_playback_date   ON playback_log(started_at);
-    `;
-    return new Promise((resolve, reject) => {
-      this.db.exec(schema, async err => {
-        if (err) reject(err);
-        else {
-          await this.run('INSERT OR IGNORE INTO emergency (id) VALUES (1)');
-          // Adicionar colunas novas se já existia banco antigo
-          const migrations = [
-            'ALTER TABLE users ADD COLUMN role TEXT DEFAULT "admin"',
-            'ALTER TABLE tvs ADD COLUMN volume INTEGER DEFAULT 100',
-            'ALTER TABLE tvs ADD COLUMN transition TEXT DEFAULT "fade"',
-            'ALTER TABLE videos ADD COLUMN config TEXT DEFAULT "{}"',
-            'ALTER TABLE videos ADD COLUMN rotation INTEGER DEFAULT 0',
-            'ALTER TABLE playlists ADD COLUMN rotation INTEGER DEFAULT 0',
-            'ALTER TABLE playlists ADD COLUMN shuffle INTEGER DEFAULT 0',
-            'ALTER TABLE widgets ADD COLUMN tv_ids TEXT DEFAULT ""',
-            'ALTER TABLE widgets ADD COLUMN rotation INTEGER DEFAULT 0',
-            'ALTER TABLE tvs ADD COLUMN pin TEXT',
-          ];
-          for (const sql of migrations) {
-            try { await this.run(sql); } catch {}
-          }
+    `);
 
-          // Gera PIN para TVs que ainda não têm
-          try {
-            const tvsSemPin = await this.all("SELECT id FROM tvs WHERE pin IS NULL OR pin = ''");
-            for (const tv of tvsSemPin) {
-              const pin = Math.floor(100000 + Math.random() * 900000).toString();
-              await this.run('UPDATE tvs SET pin = ? WHERE id = ?', [pin, tv.id]);
-              console.log(`🔑 PIN gerado para TV ${tv.id}: ${pin}`);
-            }
-          } catch(e) { console.error('Erro ao gerar PINs:', e); }
+    // Garante linha única de emergency
+    await pool.query(`INSERT INTO emergency (id) VALUES (1) ON CONFLICT (id) DO NOTHING`);
+  }
 
-          resolve();
-        }
-      });
-    });
+  async runMigrations() {
+    // Gera PIN para TVs sem PIN
+    const { rows } = await pool.query(`SELECT id FROM tvs WHERE pin IS NULL OR pin = ''`);
+    for (const tv of rows) {
+      const pin = Math.floor(100000 + Math.random() * 900000).toString();
+      await pool.query('UPDATE tvs SET pin = $1 WHERE id = $2', [pin, tv.id]);
+      console.log(`🔑 PIN gerado para TV ${tv.id}: ${pin}`);
+    }
   }
 
   async seedAdmin() {
-    const existing = await this.get('SELECT id FROM users WHERE username = ?', ['admin']);
-    if (!existing) {
+    const { rows } = await pool.query('SELECT id FROM users WHERE username = $1', ['admin']);
+    if (rows.length === 0) {
       const hash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'indoor123', 10);
-      await this.run('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', ['admin', hash, 'admin']);
+      await pool.query(
+        'INSERT INTO users (username, password, role) VALUES ($1, $2, $3)',
+        ['admin', hash, 'admin']
+      );
       console.log('✅ Usuário admin criado (senha: indoor123)');
     }
   }
 
-  run(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      this.db.run(sql, params, function(err) {
-        if (err) reject(err); else resolve({ id: this.lastID, changes: this.changes });
-      });
-    });
+  // ── Métodos compatíveis com a interface SQLite anterior ──────────
+
+  async run(sql, params = []) {
+    // Converte placeholders SQLite (?) para PostgreSQL ($1, $2...)
+    const pgSql = this._convertPlaceholders(sql);
+    const result = await pool.query(pgSql, params);
+    return { id: result.rows[0]?.id || null, changes: result.rowCount };
   }
-  get(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      this.db.get(sql, params, (err, row) => { if (err) reject(err); else resolve(row); });
-    });
+
+  async get(sql, params = []) {
+    const pgSql = this._convertPlaceholders(sql);
+    const result = await pool.query(pgSql, params);
+    return result.rows[0] || null;
   }
-  all(sql, params = []) {
-    return new Promise((resolve, reject) => {
-      this.db.all(sql, params, (err, rows) => { if (err) reject(err); else resolve(rows); });
-    });
+
+  async all(sql, params = []) {
+    const pgSql = this._convertPlaceholders(sql);
+    const result = await pool.query(pgSql, params);
+    return result.rows;
+  }
+
+  // Converte ? para $1, $2, $3...
+  _convertPlaceholders(sql) {
+    let i = 0;
+    return sql.replace(/\?/g, () => `$${++i}`);
   }
 }
 

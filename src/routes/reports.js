@@ -37,10 +37,10 @@ router.get('/playback', async (req, res) => {
 router.get('/stats', async (req, res) => {
   const [tvCount, onlineCount, totalPlays, topMedia] = await Promise.all([
     db.get('SELECT COUNT(*) as n FROM tvs'),
-    db.get(`SELECT COUNT(*) as n FROM tvs WHERE last_seen >= datetime('now','-2 minutes')`),
-    db.get('SELECT COUNT(*) as n FROM playback_log WHERE started_at >= datetime("now","-24 hours")'),
+    db.get(`SELECT COUNT(*) as n FROM tvs WHERE last_seen >= NOW() - INTERVAL '2 minutes'`),
+    db.get(`SELECT COUNT(*) as n FROM playback_log WHERE started_at >= NOW() - INTERVAL '24 hours'`),
     db.all(`SELECT video_name, COUNT(*) as plays FROM playback_log
-            WHERE started_at >= datetime('now','-7 days') AND video_name IS NOT NULL
+            WHERE started_at >= NOW() - INTERVAL '7 days' AND video_name IS NOT NULL
             GROUP BY video_name ORDER BY plays DESC LIMIT 5`),
   ]);
   res.json({ tvCount: tvCount.n, onlineCount: onlineCount.n, playsToday: totalPlays.n, topMedia });

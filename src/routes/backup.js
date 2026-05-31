@@ -80,9 +80,10 @@ router.post('/restore', async (req, res, next) => {
 
         const config = typeof pv.config === 'string' ? pv.config : JSON.stringify(pv.config||'{}');
         await db.run(
-          `INSERT OR IGNORE INTO videos
+          `INSERT INTO videos
              (id,filename,original_name,display_duration,duration,size,mime_type,media_type,config,rotation)
-           VALUES (?,?,?,?,?,0,'restored',?,?,?)`,
+           VALUES (?,?,?,?,?,0,'restored',?,?,?)
+           ON CONFLICT (id) DO NOTHING`,
           [pv.video_id, pv.filename, pv.original_name,
            pv.display_duration||10, pv.duration||0,
            pv.media_type, config, pv.video_rotation||0]
