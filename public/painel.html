@@ -3383,8 +3383,15 @@ function UsersPage({showToast}){
     if(form.max_tvs_override!=='')d.max_tvs_override=form.max_tvs_override===''?null:parseInt(form.max_tvs_override);
     const r=edit?await api.updateUser(edit.id,d):await api.createUser(d);
     setSaving(false);
-    if(r.error){showToast(r.error,'error');return;}
-    setModal(false);load();showToast(edit?'Usuário atualizado!':'Usuário criado!');
+    if(r&&r.error){
+      showToast(r.error,'error');
+      return;
+    }
+    if(!r||(!r.id&&!r.success&&!r.username)){
+      showToast('Erro ao salvar usuário. Verifique os dados e tente novamente.','error');
+      return;
+    }
+    setModal(false);load();showToast(edit?'Usuário atualizado!':'Usuário criado com sucesso!');
   };
 
   const del=async u=>{if(!confirm(`Remover ${u.username}?`))return;await api.deleteUser(u.id);load();showToast('Removido');};
@@ -3567,9 +3574,9 @@ function UsersPage({showToast}){
 
       {modal&&<Modal title={edit?`Editar — ${edit.username}`:'Novo Usuário'} onClose={()=>setModal(false)} onSave={save} saving={saving}>
         <Lbl>Nome de usuário</Lbl>
-        <Inp value={form.username} onChange={v=>setForm(f=>({...f,username:v}))} disabled={edit?.username==='admin'}/>
+        <input type="text" autoComplete="off" value={form.username} onChange={e=>setForm(f=>({...f,username:e.target.value}))} disabled={edit?.username==='admin'} style={{width:'100%',padding:'9px 12px',display:'block',marginBottom:12,borderRadius:8,border:'1px solid #CBD5E1',background:edit?.username==='admin'?'#F8FAFC':'#fff',color:'#1E293B',fontSize:13,fontFamily:"'Inter',sans-serif",opacity:edit?.username==='admin'?.7:1}}/>
         <Lbl>{edit?'Nova senha (deixe vazio para manter)':'Senha'}</Lbl>
-        <Inp value={form.password} onChange={v=>setForm(f=>({...f,password:v}))} type="password" placeholder={edit?'••••••••':'Mínimo 6 caracteres'}/>
+        <Inp value={form.password} onChange={v=>setForm(f=>({...f,password:v}))} type="password" autoComplete="new-password" placeholder={edit?'Nova senha (deixe vazio para manter)':'Mínimo 8 caracteres'}/>
         <Lbl>Função</Lbl>
         <Sel value={form.role} onChange={v=>setForm(f=>({...f,role:v}))}>
           <option value="admin">👑 Admin — Acesso total</option>

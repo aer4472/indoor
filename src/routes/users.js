@@ -71,7 +71,7 @@ router.post('/', adminOnly, async (req, res, next) => {
     // Novo usuário começa com trial de 3 dias
     const trialEnds = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
     const r = await db.run(
-      "INSERT INTO users (username, password, role, plan_id, account_status, trial_started_at, trial_ends_at) VALUES (?,?,?,?,'trial',NOW(),$1)",
+      "INSERT INTO users (username, password, role, plan_id, account_status, trial_started_at, trial_ends_at) VALUES (?,?,?,?,'trial',NOW(),?)",
       [username, hash, role, plan_id || null, trialEnds]
     );
     await db.run('INSERT INTO audit_log ("user",action,target,detail) VALUES (?,?,?,?)',
