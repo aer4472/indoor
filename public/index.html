@@ -1212,6 +1212,22 @@ function VideosPage({videos,onUpdate,showToast}){
   const [editV,setEditV]=useState(null);const [editName,setEditName]=useState('');const [editDur,setEditDur]=useState(10);const [editRot,setEditRot]=useState(0);
   const [showYt,setShowYt]=useState(false);const [ytUrl,setYtUrl]=useState('');const [ytName,setYtName]=useState('');
   const [dragOver,setDragOver]=useState(false);const [filter,setFilter]=useState('all');
+  const [selected,setSelected]=useState(new Set());
+  const [selectMode,setSelectMode]=useState(false);
+  const toggleSelect=id=>setSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
+  const selectAll=ids=>{setSelected(new Set(ids));};
+  const clearSel=()=>{setSelected(new Set());setSelectMode(false);};
+  const bulkDelete=async()=>{
+    if(!selected.size)return;
+    if(!confirm(`Remover ${selected.size} mídia(s) selecionada(s)?`))return;
+    let ok=0,fail=0;
+    for(const id of selected){
+      const r=await api.deleteVideo(id);
+      if(r.ok||r.status===200)ok++;else fail++;
+    }
+    clearSel();onUpdate();
+    showToast(fail?`${ok} removidas, ${fail} com erro`:`${ok} mídias removidas`);
+  };
   const [showFileBrowser,setShowFileBrowser]=useState(false);
   const [fbDrives,setFbDrives]=useState([]);const [fbPath,setFbPath]=useState(null);
   const [fbData,setFbData]=useState(null);const [fbLoading,setFbLoading]=useState(false);
@@ -1390,9 +1406,23 @@ function VideosPage({videos,onUpdate,showToast}){
         <p className="text-xs text-blue-400 mt-1">O arquivo será substituído. As TVs atualizarão automaticamente.</p>
       </div>}
 
+      {/* Bulk action bar */}
+      {selectMode&&(
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,marginBottom:12}}>
+          <span style={{fontSize:13,fontWeight:600,color:'#2563EB'}}>{selected.size} selecionada{selected.size!==1?'s':''}</span>
+          <button onClick={()=>selectAll(filtered.map(v=>v.id))} style={{fontSize:12,color:'#2563EB',background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:'4px 8px',borderRadius:6,transition:'background .15s'}} onMouseEnter={e=>e.currentTarget.style.background='#DBEAFE'} onMouseLeave={e=>e.currentTarget.style.background='none'}>Selecionar todos ({filtered.length})</button>
+          <div style={{flex:1}}/>
+          <button onClick={bulkDelete} style={{fontSize:12,fontWeight:700,padding:'6px 14px',borderRadius:8,border:'1px solid #FECACA',background:'#FEF2F2',color:'#DC2626',cursor:'pointer',transition:'all .15s'}} onMouseEnter={e=>e.currentTarget.style.background='#FEE2E2'} onMouseLeave={e=>e.currentTarget.style.background='#FEF2F2'}>🗑 Remover {selected.size>0?`(${selected.size})`:''}</button>
+          <button onClick={clearSel} style={{fontSize:12,padding:'6px 12px',borderRadius:8,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',cursor:'pointer'}}>✕ Cancelar</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
-        {filtered.map(v=>{const b=badge(v);return(
-          <div key={v.id} className="sv-card border border-gray-100 shadow-sm overflow-hidden group fadein">
+        {filtered.map(v=>{const b=badge(v);const isSel=selected.has(v.id);return(
+          <div key={v.id} onClick={selectMode?()=>toggleSelect(v.id):undefined}
+            className="sv-card border border-gray-100 shadow-sm overflow-hidden group fadein"
+            style={{cursor:selectMode?'pointer':'default',outline:isSel?'2px solid #0066FF':'none',outlineOffset:2,position:'relative'}}>
+          {isSel&&<div style={{position:'absolute',top:6,right:6,zIndex:10,width:20,height:20,borderRadius:6,background:'#0066FF',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700}}>✓</div>}
             <div className="relative bg-gray-900 h-24 flex items-center justify-center overflow-hidden">
               {v.media_type==='audio'?<div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-green-900 to-emerald-800 gap-1"><span className="text-3xl">🎵</span><span className="text-white text-xs font-bold">MP3</span></div>:v.media_type==='youtube'?v.mime_type==='youtube_playlist'?<div className="w-full h-full flex flex-col items-center justify-center bg-red-900 gap-1"><span className="text-2xl">📋</span><span className="text-white text-xs font-bold">Playlist YT</span></div>:<><img src={`https://img.youtube.com/vi/${v.filename}/mqdefault.jpg`} className="w-full h-full object-cover opacity-90"/><div className="absolute inset-0 flex items-center justify-center"><div className="bg-red-600 rounded-full w-7 h-7 flex items-center justify-center text-white text-xs">▶</div></div></>
               :v.media_type==='image'?<img src={`/storage/videos/${v.filename}`} className="w-full h-full object-cover"/>
@@ -1637,6 +1667,16 @@ function CityVerifier({cardForm, setCardForm}){
 }
 
 function PlaylistsPage({playlists,videos,onUpdate,showToast}){
+  const [plSelected,setPlSelected]=useState(new Set());
+  const [plSelectMode,setPlSelectMode]=useState(false);
+  const togglePlSel=id=>setPlSelected(s=>{const n=new Set(s);n.has(id)?n.delete(id):n.add(id);return n;});
+  const clearPlSel=()=>{setPlSelected(new Set());setPlSelectMode(false);};
+  const bulkDeletePl=async()=>{
+    if(!plSelected.size)return;
+    if(!confirm(`Remover ${plSelected.size} playlist(s)?`))return;
+    for(const id of plSelected) await api.deletePlaylist(id);
+    clearPlSel();onUpdate();showToast(`${plSelected.size} playlist(s) removidas`);
+  };
   const [modal,setModal]=useState(false);
   const [edit,setEdit]=useState(null);
   const [form,setForm]=useState({name:'',videoIds:[]});
@@ -1742,9 +1782,23 @@ function PlaylistsPage({playlists,videos,onUpdate,showToast}){
         <h2 className="text-xl md:text-2xl font-bold">Playlists</h2>
         <button onClick={()=>open()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">+ Nova</button>
       </div>
+      {/* Bulk action bar */}
+      {plSelectMode&&(
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,marginBottom:12}}>
+          <span style={{fontSize:13,fontWeight:600,color:'#2563EB'}}>{plSelected.size} selecionada{plSelected.size!==1?'s':''}</span>
+          <button onClick={()=>setPlSelected(new Set(playlists.map(p=>p.id)))} style={{fontSize:12,color:'#2563EB',background:'none',border:'none',cursor:'pointer',fontWeight:600,padding:'4px 8px',borderRadius:6}} onMouseEnter={e=>e.currentTarget.style.background='#DBEAFE'} onMouseLeave={e=>e.currentTarget.style.background='none'}>Selecionar todas ({playlists.length})</button>
+          <div style={{flex:1}}/>
+          <button onClick={bulkDeletePl} style={{fontSize:12,fontWeight:700,padding:'6px 14px',borderRadius:8,border:'1px solid #FECACA',background:'#FEF2F2',color:'#DC2626',cursor:'pointer'}} onMouseEnter={e=>e.currentTarget.style.background='#FEE2E2'} onMouseLeave={e=>e.currentTarget.style.background='#FEF2F2'}>🗑 Remover ({plSelected.size})</button>
+          <button onClick={clearPlSel} style={{fontSize:12,padding:'6px 12px',borderRadius:8,border:'1px solid #E2E8F0',background:'#fff',color:'#64748B',cursor:'pointer'}}>✕ Cancelar</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {playlists.map(p=>(
-          <div key={p.id} className="sv-card shadow-sm border border-gray-100 p-4 fadein">
+        {playlists.map(p=>{const isPlSel=plSelected.has(p.id);return(
+          <div key={p.id} onClick={plSelectMode?()=>togglePlSel(p.id):undefined}
+            className="sv-card shadow-sm border border-gray-100 p-4 fadein"
+            style={{cursor:plSelectMode?'pointer':'default',outline:isPlSel?'2px solid #0066FF':'none',outlineOffset:2,position:'relative'}}>
+            {isPlSel&&<div style={{position:'absolute',top:10,right:10,zIndex:10,width:22,height:22,borderRadius:6,background:'#0066FF',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:13,fontWeight:700}}>✓</div>}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 min-w-0">
                 <h3 className="font-semibold truncate">{p.name}</h3>
@@ -1771,7 +1825,7 @@ function PlaylistsPage({playlists,videos,onUpdate,showToast}){
               <button onClick={()=>del(p.id)} className="text-xs text-red-400 border border-gray-200 hover:border-red-300 px-3 py-1.5 rounded-lg transition">🗑</button>
             </div>
           </div>
-        ))}
+        );})
         {playlists.length===0&&<div className="col-span-2 text-center py-12 text-gray-400"><div className="text-3xl mb-2">📋</div><p>Nenhuma playlist</p><button onClick={()=>open()} className="mt-2 text-blue-500 text-sm">Criar agora</button></div>}
       </div>
 
@@ -2977,7 +3031,10 @@ function PlansPage({showToast}){
       {/* Plans grid */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>
         {plans.map((p,i)=>(
-          <div key={p.id} className="panel fadein" style={{position:'relative',overflow:'hidden'}}>
+          <div key={p.id} onClick={plSelectMode?()=>togglePlSel(p.id):undefined}
+            className="panel fadein"
+            style={{position:'relative',overflow:'hidden',cursor:plSelectMode?'pointer':'default',outline:isPlSel?'2px solid #0066FF':'none',outlineOffset:2}}>
+            {isPlSel&&<div style={{position:'absolute',top:10,right:10,zIndex:10,width:22,height:22,borderRadius:6,background:'#0066FF',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:13,fontWeight:700}}>✓</div>}
             <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:planColor[i%planColor.length]}}/>
             <div style={{padding:'18px 20px'}}>
               <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:12}}>
