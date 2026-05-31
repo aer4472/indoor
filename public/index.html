@@ -549,9 +549,159 @@ footer{
   .steps-wrap{grid-template-columns:1fr}
   .footer-top{grid-template-columns:1fr}
 }
+
+/* ─── PROMO BANNER ─── */
+#promo-banner {
+  position:fixed;top:0;left:0;right:0;z-index:2000;
+  height:52px;overflow:hidden;
+  background:linear-gradient(90deg,#1a1040,#1e3a8a,#1a1040);
+  background-size:200% 100%;
+  animation:bannerBg 6s ease infinite;
+  border-bottom:1px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;
+}
+@keyframes bannerBg{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+
+#promo-banner.hidden{display:none}
+
+.banner-close {
+  position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:rgba(255,255,255,.5);
+  font-size:16px;cursor:pointer;z-index:10;padding:4px 8px;
+  transition:color .2s;line-height:1;
+}
+.banner-close:hover{color:#fff}
+
+/* Carrossel */
+.banner-track {
+  display:flex;width:100%;height:100%;
+  transition:transform .6s cubic-bezier(.4,0,.2,1);
+}
+.banner-slide {
+  flex-shrink:0;width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  gap:20px;padding:0 48px 0 20px;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  cursor:pointer;
+}
+
+/* Slide images area */
+.bs-img {
+  width:32px;height:32px;border-radius:8px;
+  object-fit:cover;flex-shrink:0;
+  border:1px solid rgba(255,255,255,.15);
+}
+.bs-img-placeholder {
+  width:32px;height:32px;border-radius:8px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;border:1px solid rgba(255,255,255,.15);
+}
+.bs-text {
+  display:flex;align-items:center;gap:10px;flex:1;justify-content:center;
+  min-width:0;
+}
+.bs-badge {
+  padding:3px 10px;border-radius:100px;font-size:10px;font-weight:800;
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;flex-shrink:0;
+}
+.bs-msg {
+  font-size:13px;font-weight:600;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.bs-msg strong { color:inherit; }
+.bs-cta {
+  padding:5px 16px;border-radius:20px;font-size:11px;font-weight:800;
+  border:none;cursor:pointer;white-space:nowrap;flex-shrink:0;
+  font-family:'Plus Jakarta Sans',sans-serif;
+  transition:all .2s;letter-spacing:.03em;
+}
+.bs-cta:hover{transform:scale(1.05)}
+
+/* Dots */
+.banner-dots {
+  position:absolute;bottom:5px;left:50%;transform:translateX(-50%);
+  display:flex;gap:4px;
+}
+.bdot {
+  width:4px;height:4px;border-radius:50%;
+  background:rgba(255,255,255,.3);transition:all .3s;cursor:pointer;
+}
+.bdot.on{background:#fff;width:14px;border-radius:3px}
+
+/* Shift nav and content down when banner visible */
+body.has-banner #nav { top:52px; }
+body.has-banner #hero { padding-top:152px; }
 </style>
 </head>
-<body>
+<body class="has-banner">
+
+<!-- PROMO BANNER -->
+<div id="promo-banner">
+  <div class="banner-track" id="bannerTrack">
+
+    <!-- Slide 1 -->
+    <div class="banner-slide" onclick="window.open('https://wa.me/5591988196385?text=Ol%C3%A1!%20Vi%20a%20promo%C3%A7%C3%A3o%20no%20site%20e%20quero%20saber%20mais!','_blank')">
+      <div class="bs-img-placeholder" style="background:linear-gradient(135deg,#7C3AED,#4F46E5)">🎁</div>
+      <div class="bs-text">
+        <span class="bs-badge" style="background:#F59E0B;color:#000">OFERTA</span>
+        <span class="bs-msg">Plano Start com <strong>30% de desconto</strong> — apenas este mês! Aproveite agora.</span>
+        <button class="bs-cta" style="background:#F59E0B;color:#000">Quero o desconto →</button>
+      </div>
+    </div>
+
+    <!-- Slide 2 -->
+    <div class="banner-slide" onclick="document.getElementById('contato').scrollIntoView({behavior:'smooth'})">
+      <div class="bs-img-placeholder" style="background:linear-gradient(135deg,#2563EB,#06B6D4)">📺</div>
+      <div class="bs-text">
+        <span class="bs-badge" style="background:#2563EB;color:#fff">GRÁTIS</span>
+        <span class="bs-msg">Demonstração <strong>gratuita e sem compromisso</strong> — veja o sistema funcionando ao vivo.</span>
+        <button class="bs-cta" style="background:#2563EB;color:#fff">Agendar demo →</button>
+      </div>
+    </div>
+
+    <!-- Slide 3 -->
+    <div class="banner-slide" onclick="window.open('https://wa.me/5591988196385?text=Quero%20saber%20sobre%20o%20plano%20Business!','_blank')">
+      <div class="bs-img-placeholder" style="background:linear-gradient(135deg,#10B981,#059669)">🚀</div>
+      <div class="bs-text">
+        <span class="bs-badge" style="background:#10B981;color:#fff">LANÇAMENTO</span>
+        <span class="bs-msg">Plano Business: gerencie até <strong>10 TVs</strong> com agendamentos avançados e suporte prioritário.</span>
+        <button class="bs-cta" style="background:#10B981;color:#fff">Conhecer plano →</button>
+      </div>
+    </div>
+
+    <!-- Slide 4 -->
+    <div class="banner-slide" onclick="window.open('https://wa.me/5591988196385','_blank')">
+      <div class="bs-img-placeholder" style="background:linear-gradient(135deg,#EF4444,#DC2626)">⚡</div>
+      <div class="bs-text">
+        <span class="bs-badge" style="background:#EF4444;color:#fff">URGENTE</span>
+        <span class="bs-msg"><strong>Vagas limitadas</strong> para implantação gratuita este mês — instale o sistema sem custo.</span>
+        <button class="bs-cta" style="background:#EF4444;color:#fff">Garantir vaga →</button>
+      </div>
+    </div>
+
+    <!-- Slide 5 -->
+    <div class="banner-slide" onclick="document.getElementById('planos').scrollIntoView({behavior:'smooth'})">
+      <div class="bs-img-placeholder" style="background:linear-gradient(135deg,#F59E0B,#D97706)">🏆</div>
+      <div class="bs-text">
+        <span class="bs-badge" style="background:linear-gradient(90deg,#F59E0B,#EF4444);color:#fff">ESPECIAL</span>
+        <span class="bs-msg">Plano Enterprise com <strong>TVs ilimitadas</strong> — ideal para redes de lojas e franquias.</span>
+        <button class="bs-cta" style="background:linear-gradient(90deg,#F59E0B,#EF4444);color:#fff">Ver planos →</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Dots indicator -->
+  <div class="banner-dots" id="bannerDots">
+    <div class="bdot on" onclick="goSlide(0)"></div>
+    <div class="bdot"    onclick="goSlide(1)"></div>
+    <div class="bdot"    onclick="goSlide(2)"></div>
+    <div class="bdot"    onclick="goSlide(3)"></div>
+    <div class="bdot"    onclick="goSlide(4)"></div>
+  </div>
+
+  <button class="banner-close" onclick="closeBanner()" title="Fechar">✕</button>
+</div>
 
 <!-- NAV -->
 <nav id="nav">
@@ -579,7 +729,19 @@ footer{
 
 <!-- HERO -->
 <section id="hero">
-  <div class="hero-bg"></div>
+  <!-- Background photo — ambiente corporativo com TVs/monitores -->
+  <div style="position:absolute;inset:0;z-index:0;overflow:hidden;">
+    <img
+      src="/hero-bg.png"
+      alt=""
+      style="width:100%;height:100%;object-fit:cover;object-position:center;opacity:.28;transform:scale(1.04);filter:blur(0.5px)"
+      loading="eager"
+    >
+    <!-- Dark gradient overlay -->
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,14,26,.75) 0%,rgba(10,14,26,.55) 40%,rgba(10,14,26,.88) 100%)"></div>
+    <!-- Blue radial glow on top -->
+    <div style="position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -5%,rgba(37,99,235,.25) 0%,transparent 70%)"></div>
+  </div>
   <div class="hero-grid"></div>
 
   <div class="hero-pill anim"><div class="pill-dot"></div>Sistema de TV Corporativa · Digital Signage</div>
@@ -1072,6 +1234,35 @@ function sendForm(){
     document.getElementById('cfForm').style.display = 'none';
     document.getElementById('cfOk').style.display = 'block';
   }, 600);
+}
+
+// ── PROMO BANNER ─────────────────────────────────────────────
+let bannerSlide = 0;
+const BANNER_TOTAL = 5;
+let bannerTimer = null;
+
+function goSlide(n) {
+  bannerSlide = n;
+  document.getElementById('bannerTrack').style.transform = `translateX(-${n * 100}%)`;
+  document.querySelectorAll('.bdot').forEach((d, i) => d.classList.toggle('on', i === n));
+}
+
+function nextSlide() {
+  goSlide((bannerSlide + 1) % BANNER_TOTAL);
+}
+
+function closeBanner() {
+  document.getElementById('promo-banner').classList.add('hidden');
+  document.body.classList.remove('has-banner');
+  clearInterval(bannerTimer);
+  sessionStorage.setItem('bannerClosed', '1');
+}
+
+// Auto-rotate every 4s
+if (!sessionStorage.getItem('bannerClosed')) {
+  bannerTimer = setInterval(nextSlide, 4000);
+} else {
+  closeBanner();
 }
 </script>
 </body>
