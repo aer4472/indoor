@@ -1381,11 +1381,18 @@ function VideosPage({videos,onUpdate,showToast}){
           <button onClick={()=>fileRef.current.click()} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition">+ Upload</button>
         </div>
       </div>
-      {/* Filtros */}
-      <div className="flex gap-1.5 mb-3">
-        {[['all','Todos'],['video','Vídeos'],['audio','Áudio'],['image','Imagens'],['pdf','PDFs'],['youtube','YouTube']].map(([v,l])=>(
-          <button key={v} onClick={()=>setFilter(v)} className={`px-2.5 py-1 rounded-lg text-xs transition ${filter===v?'bg-blue-600 text-white':'bg-white border border-gray-200 text-gray-600 hover:border-blue-300'}`}>{l}</button>
-        ))}
+      {/* Filtros + Selecionar */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:12,flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {[['all','Todos'],['video','Vídeos'],['audio','Áudio'],['image','Imagens'],['pdf','PDFs'],['youtube','YouTube']].map(([v,l])=>(
+            <button key={v} onClick={()=>setFilter(v)} style={{padding:'6px 12px',borderRadius:8,fontSize:12,fontWeight:600,border:'none',cursor:'pointer',transition:'all .15s',background:filter===v?'#0066FF':'#F1F5F9',color:filter===v?'#fff':'#64748B'}}>
+              {l}
+            </button>
+          ))}
+        </div>
+        <button onClick={()=>{setSelectMode(m=>!m);if(selectMode)clearSel();}} style={{fontSize:12,fontWeight:600,padding:'7px 14px',borderRadius:8,border:`1px solid ${selectMode?'#0066FF':'#E2E8F0'}`,background:selectMode?'#EFF6FF':'#fff',color:selectMode?'#0066FF':'#64748B',cursor:'pointer',transition:'all .15s',display:'flex',alignItems:'center',gap:5,whiteSpace:'nowrap'}}>
+          {selectMode?'✕ Cancelar':'☑ Selecionar'}
+        </button>
       </div>
       <div className={`border-2 border-dashed rounded-xl p-4 text-center mb-4 cursor-pointer transition ${dragOver?'border-blue-400 bg-blue-50':'border-gray-200 hover:border-blue-300'}`}
         onClick={()=>fileRef.current.click()} onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)}
