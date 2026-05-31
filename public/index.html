@@ -3452,28 +3452,55 @@ function UsersPage({showToast}){
 }
 
 // ── APARÊNCIA ────────────────────────────────────────────────────
-const THEMES_PRESET = [
-  {name:'Escuro padrão',  sidebarBg:'#111827',sidebarText:'#9ca3af',sidebarActive:'#2563eb',accentColor:'#2563eb'},
-  {name:'Azul oceano',    sidebarBg:'#0c1a3a',sidebarText:'#93c5fd',sidebarActive:'#3b82f6',accentColor:'#3b82f6'},
-  {name:'Verde floresta', sidebarBg:'#052e16',sidebarText:'#86efac',sidebarActive:'#16a34a',accentColor:'#16a34a'},
-  {name:'Roxo elegante',  sidebarBg:'#1e1b4b',sidebarText:'#c4b5fd',sidebarActive:'#7c3aed',accentColor:'#7c3aed'},
-  {name:'Grafite',        sidebarBg:'#1c1c1e',sidebarText:'#8e8e93',sidebarActive:'#ff9f0a',accentColor:'#ff9f0a'},
-  {name:'Vermelho forte', sidebarBg:'#1c0a0a',sidebarText:'#fca5a5',sidebarActive:'#dc2626',accentColor:'#dc2626'},
-  {name:'Branco limpo',   sidebarBg:'#ffffff',sidebarText:'#6b7280',sidebarActive:'#2563eb',accentColor:'#2563eb'},
-  {name:'Marrom madeira', sidebarBg:'#292118',sidebarText:'#d6c8b0',sidebarActive:'#d97706',accentColor:'#d97706'},
+const ACCENT_PRESETS = [
+  {name:'Azul (padrão)',  color:'#0066FF'},
+  {name:'Índigo',         color:'#4F46E5'},
+  {name:'Roxo',           color:'#7C3AED'},
+  {name:'Verde',          color:'#16A34A'},
+  {name:'Teal',           color:'#0D9488'},
+  {name:'Laranja',        color:'#EA580C'},
+  {name:'Rosa',           color:'#DB2777'},
+  {name:'Vermelho',       color:'#DC2626'},
 ];
 
-function AppearancePage({theme,setTheme,showToast}){
+function AppearancePage({theme,setTheme,showToast,loadSettings}){
   const [form,setForm]=useState({...theme});
   const [saving,setSaving]=useState(false);
   const [logoUploading,setLogoUploading]=useState(false);
+  const [restoring,setRestoring]=useState(false);
+  const [restoreResult,setRestoreResult]=useState(null);
   const fileRef=useRef();
   const restoreRef=useRef();
 
-  // ── Backup / Restore ────────────────────────────────────────────
-  const [restoring,setRestoring]=useState(false);
-  const [restoreResult,setRestoreResult]=useState(null);
+  useEffect(()=>setForm({...theme}),[theme]);
+  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
 
+  // ── Logo upload ──────────────────────────────────────────────
+  const uploadPanelLogo=async file=>{
+    if(!file)return;
+    setLogoUploading(true);
+    try{
+      const r=await api.uploadLogo(file,'panel');
+      if(r.url) set('panelLogo',r.url);
+      else if(r.error) showToast(r.error,'error');
+    }catch(e){showToast('Erro no upload','error');}
+    setLogoUploading(false);
+  };
+
+  // ── Save ─────────────────────────────────────────────────────
+  const save=async()=>{
+    setSaving(true);
+    try{
+      await api.saveSettings(form);
+      setTheme(form);
+      // Apply accent color to CSS variables immediately
+      document.documentElement.style.setProperty('--blue', form.accentColor||'#0066FF');
+      showToast('Aparência salva!');
+    }catch{showToast('Erro ao salvar','error');}
+    setSaving(false);
+  };
+
+  // ── Backup / Restore ─────────────────────────────────────────
   const doBackup=async()=>{
     try{
       const h={};if(TOKEN)h['Authorization']=`Bearer ${TOKEN}`;
@@ -3482,17 +3509,15 @@ function AppearancePage({theme,setTheme,showToast}){
       const blob=await r.blob();
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a');
-      a.href=url;
-      a.download=`smartvision-backup-${new Date().toISOString().slice(0,10)}.json`;
-      a.click();
+      a.href=url;a.download=`smartvision-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();
       URL.revokeObjectURL(url);
-      showToast('✅ Backup baixado com sucesso!');
+      showToast('Backup baixado!');
     }catch(e){showToast('Erro: '+e.message,'error');}
   };
 
   const doRestore=async file=>{
     if(!file)return;
-    if(!confirm('Restaurar backup? Dados existentes com o mesmo ID serão mantidos — novos serão adicionados.'))return;
+    if(!confirm('Restaurar backup? Dados existentes com o mesmo ID serão mantidos.'))return;
     setRestoring(true);setRestoreResult(null);
     try{
       const text=await file.text();
@@ -3502,195 +3527,167 @@ function AppearancePage({theme,setTheme,showToast}){
       const j=await r.json();
       if(j.error){showToast(j.error,'error');setRestoring(false);return;}
       setRestoreResult(j.report);
-      showToast('✅ Backup restaurado!');
+      showToast('Backup restaurado!');
     }catch(e){showToast('Arquivo inválido: '+e.message,'error');}
     setRestoring(false);
   };
 
-  useEffect(()=>setForm({...theme}),[theme]);
-
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-
-  const uploadPanelLogo=async file=>{
-    if(!file)return;
-    setLogoUploading(true);
-    try{
-      const r=await api.uploadLogo(file,'panel');
-      if(r.url)set('panelLogo',r.url);
-      else if(r.error)showToast(r.error,'error');
-    }catch(e){showToast('Erro no upload','error');}
-    setLogoUploading(false);
-  };
-
-  const save=async()=>{
-    setSaving(true);
-    try{
-      await api.saveSettings(form);
-      setTheme(form);
-      showToast('🎨 Aparência salva com sucesso!');
-    }catch{showToast('Erro ao salvar','error');}
-    setSaving(false);
-  };
-
-  const removeLogo=async()=>{
-    set('panelLogo','');
-  };
-
-  // Preview da sidebar
-  const PreviewSidebar=()=>(
-    <div className="rounded-xl overflow-hidden shadow-xl" style={{width:150,background:form.sidebarBg,minHeight:280,display:'flex',flexDirection:'column'}}>
-      <div style={{padding:'14px 12px',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
-        {form.panelLogo
-          ? <img src={form.panelLogo} alt="Logo" style={{height:28,maxWidth:110,objectFit:'contain',borderRadius:3}}/>
-          : <div style={{display:'flex',alignItems:'center',gap:6}}>
-              <span style={{fontSize:20}}>📺</span>
-              <span style={{fontWeight:700,fontSize:12,color:'#fff'}}>{form.panelName||'SmartVision Pro'}</span>
-            </div>
-        }
-        <p style={{fontSize:10,color:'rgba(255,255,255,.3)',marginTop:2}}>admin</p>
-      </div>
-      <div style={{padding:8,flex:1,display:'flex',flexDirection:'column',gap:2}}>
-        {['Dashboard','TVs','Mídias','Playlists'].map((l,i)=>(
-          <div key={l} style={{
-            padding:'7px 10px',borderRadius:8,fontSize:11,
-            background:i===0?form.sidebarActive:'transparent',
-            color:i===0?'#fff':form.sidebarText,
-          }}>{l}</div>
-        ))}
-      </div>
-      <div style={{padding:8,borderTop:'1px solid rgba(255,255,255,.07)'}}>
-        <div style={{padding:'6px 10px',borderRadius:8,fontSize:10,background:'rgba(255,255,255,.06)',color:form.sidebarText,textAlign:'center'}}>🔄 Recarregar TVs</div>
-      </div>
-    </div>
-  );
+  const accent = form.accentColor||'#0066FF';
 
   return (
-    <div className="p-4 md:p-6 fadein max-w-3xl">
-      <h2 className="text-xl md:text-2xl font-bold mb-1">🎨 Aparência do Painel</h2>
-      <p className="text-gray-500 text-sm mb-6">Personalize cores, logo e nome do sistema</p>
+    <div className="fadein page-content" style={{maxWidth:900}}>
+      <div style={{marginBottom:24}}>
+        <h2 className="page-title">Aparência</h2>
+        <p className="page-sub">Personalize a identidade visual do SmartVision Pro</p>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Coluna esquerda — configurações */}
-        <div className="space-y-5">
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
 
-          {/* Logo do painel */}
-          <div className="sv-card border border-gray-100 shadow-sm p-4">
-            <h3 className="font-semibold text-sm mb-3">🖼 Logo do painel</h3>
+        {/* ── COL 1 ── */}
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+
+          {/* Logo */}
+          <div className="panel" style={{padding:'18px 20px'}}>
+            <div className="panel-title" style={{marginBottom:14}}>🖼 Logo do painel</div>
             <div onClick={()=>fileRef.current?.click()}
-              className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition mb-3 ${form.panelLogo?'border-green-300 bg-green-50':'border-gray-200 hover:border-blue-300'}`}>
+              style={{border:`2px dashed ${form.panelLogo?'#22C55E':'#CBD5E1'}`,borderRadius:12,padding:'20px',textAlign:'center',cursor:'pointer',marginBottom:12,background:form.panelLogo?'#F0FDF4':'#F8FAFC',transition:'all .2s'}}
+              onMouseEnter={e=>e.currentTarget.style.borderColor=form.panelLogo?'#16A34A':accent}
+              onMouseLeave={e=>e.currentTarget.style.borderColor=form.panelLogo?'#22C55E':'#CBD5E1'}>
               {logoUploading
-                ? <p className="text-sm text-blue-600">⏳ Enviando...</p>
+                ? <p style={{fontSize:13,color:'#0066FF'}}>⏳ Enviando...</p>
                 : form.panelLogo
-                  ? <div>
-                      <img src={form.panelLogo} alt="Logo" className="mx-auto mb-2" style={{maxHeight:52,maxWidth:'100%',objectFit:'contain'}}/>
-                      <p className="text-xs text-green-600 font-medium">✅ Clique para trocar</p>
-                    </div>
-                  : <div><div className="text-2xl mb-1">🖼</div><p className="text-sm text-gray-500">Clique para enviar</p><p className="text-xs text-gray-400">PNG, JPG, GIF, WebP · Máx. 10 MB</p></div>
+                  ? <div><img src={form.panelLogo} alt="Logo" style={{maxHeight:52,maxWidth:'100%',objectFit:'contain',display:'block',margin:'0 auto 8px'}}/><p style={{fontSize:12,color:'#16A34A',fontWeight:600}}>✓ Clique para trocar</p></div>
+                  : <div><div style={{fontSize:28,marginBottom:6}}>🖼</div><p style={{fontSize:13,color:'#64748B',fontWeight:500}}>Clique para enviar logo</p><p style={{fontSize:11,color:'#94A3B8'}}>PNG, JPG, WebP · Máx. 10 MB</p></div>
               }
             </div>
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" className="hidden"
-              onChange={e=>uploadPanelLogo(e.target.files?.[0])}/>
+            <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}} onChange={e=>uploadPanelLogo(e.target.files?.[0])}/>
             {form.panelLogo
-              ? <button onClick={removeLogo} className="w-full text-xs text-red-500 border border-red-200 rounded-lg py-1.5 hover:bg-red-50 transition">🗑 Remover logo</button>
-              : <>
-                  <Lbl>Nome exibido (sem logo)</Lbl>
-                  <Inp value={form.panelName||''} onChange={v=>set('panelName',v)} placeholder="SmartVision Pro"/>
-                </>
+              ? <button onClick={()=>set('panelLogo','')} style={{width:'100%',padding:'8px',borderRadius:8,border:'1px solid #FECACA',background:'#FEF2F2',color:'#DC2626',fontSize:12,fontWeight:600,cursor:'pointer'}}>🗑 Remover logo</button>
+              : <div><Lbl>Nome do sistema (sem logo)</Lbl><Inp value={form.panelName||''} onChange={v=>set('panelName',v)} placeholder="SmartVision Pro"/></div>
             }
           </div>
 
-          {/* Presets de tema */}
-          <div className="sv-card border border-gray-100 shadow-sm p-4">
-            <h3 className="font-semibold text-sm mb-3">⚡ Temas prontos</h3>
-            <div className="grid grid-cols-2 gap-1.5">
-              {THEMES_PRESET.map(t=>(
-                <button key={t.name} onClick={()=>setForm(f=>({...f,...t}))}
-                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-gray-200 hover:border-blue-300 transition text-xs text-left">
-                  <div className="flex gap-0.5 flex-shrink-0">
-                    <div style={{width:10,height:20,background:t.sidebarBg,borderRadius:'3px 0 0 3px'}}/>
-                    <div style={{width:10,height:20,background:t.sidebarActive,borderRadius:'0 3px 3px 0'}}/>
-                  </div>
-                  <span className="truncate">{t.name}</span>
+          {/* Cor de destaque */}
+          <div className="panel" style={{padding:'18px 20px'}}>
+            <div className="panel-title" style={{marginBottom:14}}>🎨 Cor de destaque</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:14}}>
+              {ACCENT_PRESETS.map(p=>(
+                <button key={p.color} onClick={()=>set('accentColor',p.color)}
+                  style={{padding:'8px 4px',borderRadius:8,border:`2px solid ${form.accentColor===p.color?p.color:'#E2E8F0'}`,background:form.accentColor===p.color?`${p.color}15`:'#fff',cursor:'pointer',transition:'all .15s',display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                  <div style={{width:20,height:20,borderRadius:6,background:p.color}}/>
+                  <span style={{fontSize:9,color:'#64748B',fontWeight:600,textAlign:'center',lineHeight:1.2}}>{p.name}</span>
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Cores personalizadas */}
-          <div className="sv-card border border-gray-100 shadow-sm p-4">
-            <h3 className="font-semibold text-sm mb-3">🖌 Cores personalizadas</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ['sidebarBg',   'Fundo da sidebar'],
-                ['sidebarText', 'Texto inativo'],
-                ['sidebarActive','Item ativo'],
-                ['accentColor', 'Cor de destaque'],
-              ].map(([k,label])=>(
-                <div key={k}>
-                  <Lbl>{label}</Lbl>
-                  <div className="flex items-center gap-2 mb-3">
-                    <input type="color" value={form[k]||'#000000'} onChange={e=>set(k,e.target.value)}
-                      className="w-10 h-9 rounded border border-gray-200 cursor-pointer flex-shrink-0"/>
-                    <input type="text" value={form[k]||''} onChange={e=>set(k,e.target.value)}
-                      className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-400" placeholder="#000000"/>
-                  </div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <input type="color" value={form.accentColor||'#0066FF'} onChange={e=>set('accentColor',e.target.value)}
+                style={{width:44,height:44,borderRadius:8,border:'1px solid #E2E8F0',cursor:'pointer',padding:2}}/>
+              <div style={{flex:1}}>
+                <Lbl>Código hex</Lbl>
+                <Inp value={form.accentColor||''} onChange={v=>set('accentColor',v)} placeholder="#0066FF"/>
+              </div>
+            </div>
+            {/* Preview dos elementos */}
+            <div style={{marginTop:14,padding:'12px',background:'#F8FAFC',borderRadius:10,border:'1px solid #E2E8F0'}}>
+              <div style={{fontSize:11,color:'#94A3B8',marginBottom:8,fontWeight:600}}>Pré-visualização</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                <button style={{padding:'7px 14px',borderRadius:8,background:accent,color:'#fff',border:'none',fontSize:12,fontWeight:600}}>Botão primário</button>
+                <span style={{fontSize:12,color:accent,fontWeight:600}}>Link ativo</span>
+                <div style={{height:4,width:80,borderRadius:4,background:`${accent}30`,position:'relative'}}>
+                  <div style={{height:4,width:'60%',borderRadius:4,background:accent}}/>
                 </div>
-              ))}
+              </div>
             </div>
           </div>
+
+          {/* Nome do painel */}
+          {!form.panelLogo&&<div className="panel" style={{padding:'18px 20px'}}>
+            <div className="panel-title" style={{marginBottom:14}}>✏️ Nome do sistema</div>
+            <Lbl>Nome exibido no painel</Lbl>
+            <Inp value={form.panelName||''} onChange={v=>set('panelName',v)} placeholder="SmartVision Pro"/>
+          </div>}
+
         </div>
 
-        {/* Coluna direita — preview */}
-        <div>
-          <div className="sticky top-4">
-            <div className="sv-card border border-gray-100 shadow-sm p-4 mb-4">
-              <h3 className="font-semibold text-sm mb-3">👁 Preview ao vivo</h3>
-              <div className="flex justify-center">
-                <PreviewSidebar/>
-              </div>
-              <p className="text-xs text-gray-400 text-center mt-3">Reflita as alterações em tempo real</p>
-            </div>
-            <button onClick={save} disabled={saving}
-              className="w-full py-3 rounded-xl text-white font-semibold transition disabled:opacity-50 shadow-lg"
-              style={{background:form.accentColor||'#2563eb',boxShadow:`0 4px 14px ${(form.accentColor||'#2563eb')}44`}}>
-              {saving?'Salvando...':'💾 Salvar aparência'}
-            </button>
-            <p className="text-xs text-gray-400 text-center mt-2">As cores são aplicadas imediatamente ao salvar</p>
+        {/* ── COL 2 ── */}
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
 
-            {/* ── Backup / Restore ── */}
-            <div className="mt-6 pt-6 border-t border-gray-100">
-              <h3 className="font-semibold text-gray-800 mb-1">📦 Backup e Restauração</h3>
-              <p className="text-xs text-gray-400 mb-4">Salva TVs cadastradas, playlists e agendamentos. <strong>Não inclui arquivos de mídia.</strong></p>
-              <div className="flex gap-3">
-                <button onClick={doBackup}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 text-sm font-semibold transition">
-                  ⬇️ Baixar backup
-                </button>
-                <button onClick={()=>restoreRef.current?.click()} disabled={restoring}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-green-200 text-green-700 bg-green-50 hover:bg-green-100 text-sm font-semibold transition disabled:opacity-50">
-                  {restoring?'⏳ Restaurando…':'⬆️ Restaurar backup'}
-                </button>
-                <input ref={restoreRef} type="file" accept=".json" className="hidden"
-                  onChange={e=>{doRestore(e.target.files?.[0]);e.target.value='';}}/>
-              </div>
-              {restoreResult&&<div className="mt-3 bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-600">
-                <p className="font-semibold text-gray-800 mb-1">✅ Restauração concluída:</p>
-                <div className="grid grid-cols-3 gap-1">
-                  {[['TVs',restoreResult.tvs],['Playlists',restoreResult.playlists],['Vínculos',restoreResult.playlist_videos],['Agendamentos',restoreResult.schedules],['Widgets',restoreResult.widgets],['Ignorados',restoreResult.skipped]].map(([l,v])=>(
-                    <div key={l} className="sv-card p-2 text-center border border-gray-100">
-                      <div className="text-lg font-bold text-gray-800">{v}</div>
-                      <div className="text-gray-400">{l}</div>
+          {/* Preview da sidebar */}
+          <div className="panel" style={{padding:'18px 20px'}}>
+            <div className="panel-title" style={{marginBottom:14}}>👁 Preview ao vivo</div>
+            <div style={{display:'flex',justifyContent:'center'}}>
+              <div style={{width:170,background:'#fff',border:'1px solid #E2E8F0',borderRadius:12,overflow:'hidden',boxShadow:'0 4px 16px rgba(0,0,0,.08)'}}>
+                <div style={{padding:'12px',borderBottom:'1px solid #E2E8F0'}}>
+                  {form.panelLogo
+                    ? <img src={form.panelLogo} alt="" style={{height:26,objectFit:'contain',maxWidth:130}}/>
+                    : <div style={{fontSize:12,fontWeight:800,color:'#1E293B'}}>{form.panelName||'SmartVision Pro'}</div>
+                  }
+                  <div style={{fontSize:9,color:'#94A3B8',marginTop:3}}>● Sistema Online</div>
+                </div>
+                <div style={{padding:'6px'}}>
+                  {['Dashboard','TVs','Mídias','Playlists'].map((l,i)=>(
+                    <div key={l} style={{padding:'7px 10px',borderRadius:7,fontSize:11,marginBottom:1,background:i===0?`${accent}15`:'transparent',color:i===0?accent:'#64748B',fontWeight:i===0?600:400,borderLeft:i===0?`3px solid ${accent}`:'3px solid transparent'}}>
+                      {l}
                     </div>
                   ))}
                 </div>
-              </div>}
+                <div style={{padding:'8px',borderTop:'1px solid #E2E8F0'}}>
+                  <div style={{padding:'6px 8px',borderRadius:7,fontSize:10,background:'#F8FAFC',color:'#94A3B8',textAlign:'center'}}>↺ Recarregar TVs</div>
+                </div>
+              </div>
             </div>
+            <p style={{fontSize:11,color:'#94A3B8',textAlign:'center',marginTop:10}}>Atualiza em tempo real</p>
           </div>
+
+          {/* Salvar */}
+          <div className="panel" style={{padding:'18px 20px'}}>
+            <button onClick={save} disabled={saving}
+              style={{width:'100%',padding:'13px',borderRadius:10,border:'none',cursor:'pointer',fontSize:14,fontWeight:700,color:'#fff',background:accent,boxShadow:`0 4px 14px ${accent}55`,transition:'all .2s',opacity:saving?.7:1}}>
+              {saving?'Salvando...':'💾 Salvar aparência'}
+            </button>
+            <p style={{fontSize:11,color:'#94A3B8',textAlign:'center',marginTop:8}}>As cores são aplicadas imediatamente</p>
+          </div>
+
+          {/* Backup */}
+          <div className="panel" style={{padding:'18px 20px'}}>
+            <div className="panel-title" style={{marginBottom:6}}>📦 Backup e Restauração</div>
+            <p style={{fontSize:12,color:'#94A3B8',marginBottom:14}}>Salva TVs, playlists e agendamentos. <strong style={{color:'#64748B'}}>Não inclui arquivos de mídia.</strong></p>
+            <div style={{display:'flex',gap:8,marginBottom:12}}>
+              <button onClick={doBackup}
+                style={{flex:1,padding:'10px',borderRadius:8,border:'1px solid #BFDBFE',background:'#EFF6FF',color:'#2563EB',fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .2s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='#DBEAFE'}
+                onMouseLeave={e=>e.currentTarget.style.background='#EFF6FF'}>
+                ⬇️ Baixar backup
+              </button>
+              <button onClick={()=>restoreRef.current?.click()} disabled={restoring}
+                style={{flex:1,padding:'10px',borderRadius:8,border:'1px solid #BBF7D0',background:'#F0FDF4',color:'#16A34A',fontSize:12,fontWeight:600,cursor:'pointer',transition:'all .2s',opacity:restoring?.6:1}}
+                onMouseEnter={e=>!restoring&&(e.currentTarget.style.background='#DCFCE7')}
+                onMouseLeave={e=>e.currentTarget.style.background='#F0FDF4'}>
+                {restoring?'⏳ Restaurando...':'⬆️ Restaurar'}
+              </button>
+              <input ref={restoreRef} type="file" accept=".json" style={{display:'none'}} onChange={e=>{doRestore(e.target.files?.[0]);e.target.value='';}}/>
+            </div>
+            {restoreResult&&(
+              <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:10,padding:'12px',fontSize:12}}>
+                <div style={{fontWeight:700,color:'#15803D',marginBottom:8}}>✓ Restauração concluída</div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6}}>
+                  {[['TVs',restoreResult.tvs],['Playlists',restoreResult.playlists],['Vínculos',restoreResult.playlist_videos],['Agendamentos',restoreResult.schedules],['Widgets',restoreResult.widgets],['Ignorados',restoreResult.skipped]].map(([l,v])=>(
+                    <div key={l} style={{background:'#fff',borderRadius:7,padding:'8px',textAlign:'center',border:'1px solid #D1FAE5'}}>
+                      <div style={{fontSize:16,fontWeight:800,color:'#15803D'}}>{v||0}</div>
+                      <div style={{fontSize:10,color:'#64748B'}}>{l}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     </div>
   );
 }
+
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
