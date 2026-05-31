@@ -3192,10 +3192,9 @@ function PlansPage({showToast}){
       {/* Plans grid */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>
         {plans.map((p,i)=>(
-          <div key={p.id} onClick={plSelectMode?()=>togglePlSel(p.id):undefined}
+          <div key={p.id}
             className="panel fadein"
-            style={{position:'relative',overflow:'hidden',cursor:plSelectMode?'pointer':'default',outline:isPlSel?'2px solid #0066FF':'none',outlineOffset:2}}>
-            {isPlSel&&<div style={{position:'absolute',top:10,right:10,zIndex:10,width:22,height:22,borderRadius:6,background:'#0066FF',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:13,fontWeight:700}}>✓</div>}
+            style={{position:'relative',overflow:'hidden'}}>
             <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:planColor[i%planColor.length]}}/>
             <div style={{padding:'18px 20px'}}>
               <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:12}}>
