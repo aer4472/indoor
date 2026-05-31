@@ -734,19 +734,18 @@ body.has-banner #hero { padding-top:152px; }
 </div>
 
 <!-- HERO -->
-<section id="hero">
-  <!-- Background photo — ambiente corporativo com TVs/monitores -->
-  <div style="position:absolute;inset:0;z-index:0;overflow:hidden;">
-    <img
-      src="/hero-bg.png"
-      alt=""
-      style="width:100%;height:100%;object-fit:cover;object-position:center;opacity:.28;transform:scale(1.04);filter:blur(0.5px)"
-      loading="eager"
-    >
-    <!-- Dark gradient overlay -->
-    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,14,26,.75) 0%,rgba(10,14,26,.55) 40%,rgba(10,14,26,.88) 100%)"></div>
-    <!-- Blue radial glow on top -->
-    <div style="position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -5%,rgba(37,99,235,.25) 0%,transparent 70%)"></div>
+<section id="hero" style="overflow:hidden;isolation:isolate">
+  <!-- Hero background — imagem corporativa com overlay -->
+  <div style="position:absolute;inset:0;z-index:0;overflow:hidden;border-radius:0">
+    <div style="position:absolute;inset:0;
+      background-image:url('/hero-bg.png');
+      background-size:cover;background-position:center;
+      opacity:.22;transform:scale(1.03);filter:blur(0.5px)">
+    </div>
+    <!-- Overlay escuro que garante legibilidade -->
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,14,26,.78) 0%,rgba(10,14,26,.6) 40%,rgba(10,14,26,.98) 90%,var(--dark) 100%)"></div>
+    <!-- Radial azul sutil -->
+    <div style="position:absolute;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -5%,rgba(37,99,235,.2) 0%,transparent 65%)"></div>
   </div>
   <div class="hero-grid"></div>
 
@@ -1165,7 +1164,7 @@ body.has-banner #hero { padding-top:152px; }
 </section>
 
 <!-- FOOTER -->
-<footer>
+<footer style="position:relative;z-index:1;background:var(--dark2)">
   <div class="footer-inner">
     <div class="footer-top">
       <div>
