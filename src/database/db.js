@@ -171,7 +171,13 @@ class Database {
     // Converte placeholders SQLite (?) para PostgreSQL ($1, $2...)
     const pgSql = this._convertPlaceholders(sql);
     const result = await pool.query(pgSql, params);
-    return { id: result.rows[0]?.id || null, changes: result.rowCount };
+    // Support RETURNING clause — return first row's id if available
+    const firstRow = result.rows[0];
+    return {
+      id: firstRow?.id ?? null,
+      changes: result.rowCount,
+      row: firstRow || null,
+    };
   }
 
   async get(sql, params = []) {

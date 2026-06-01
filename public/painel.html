@@ -3387,8 +3387,8 @@ function UsersPage({showToast}){
       showToast(r.error,'error');
       return;
     }
-    if(!r||(!r.id&&!r.success&&!r.username)){
-      showToast('Erro ao salvar usuário. Verifique os dados e tente novamente.','error');
+    if(!r||(r.error)){
+      showToast('Erro ao salvar. Tente novamente.','error');
       return;
     }
     setModal(false);load();showToast(edit?'Usuário atualizado!':'Usuário criado com sucesso!');
@@ -3598,6 +3598,9 @@ function UsersPage({showToast}){
       </div>
 
       {modal&&<Modal title={edit?`Editar — ${edit.username}`:'Novo Usuário'} onClose={()=>setModal(false)} onSave={save} saving={saving}>
+        {/* Honeypot fields to prevent Chrome password manager interference */}
+        <input type="text" name="fake_user" style={{display:'none'}} readOnly autoComplete="username"/>
+        <input type="password" name="fake_pass" style={{display:'none'}} readOnly autoComplete="new-password"/>
         <Lbl>Nome de usuário</Lbl>
         <input type="text" autoComplete="off" value={form.username} onChange={e=>setForm(f=>({...f,username:e.target.value}))} disabled={edit?.username==='admin'} style={{width:'100%',padding:'9px 12px',display:'block',marginBottom:12,borderRadius:8,border:'1px solid #CBD5E1',background:edit?.username==='admin'?'#F8FAFC':'#fff',color:'#1E293B',fontSize:13,fontFamily:"'Inter',sans-serif",opacity:edit?.username==='admin'?.7:1}}/>
         <Lbl>{edit?'Nova senha (deixe vazio para manter)':'Senha'}</Lbl>
